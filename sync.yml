@@ -1,1 +1,124 @@
 
+# .github/workflows/sync_upstream.yml
+
+name: Sync Upstream Repository
+
+on:
+  # 1. 定时触发：使用 cron 语法，这里设置为每6小时执行一次
+  schedule:
+    - cron: '0 */6 * * *'
+  
+  # 2. 手动触发：允许你在 Actions 页面手动运行此工作流
+  workflow_dispatch:
+
+# 环境变量，请根据你的情况修改
+env:
+  # 源仓库（你要同步的仓库）
+  UPSTREAM_REPO: "https://github.com/fishjar/kiss-translator.git" 
+  # 你的目标仓库（当前仓库）
+  DESTINATION_REPO: "https://github.com/coco-coc/kiss-translator.git"
+  # 源仓库的用户名/仓库名，用于API调用
+  UPSTREAM_REPO_NAME: "fishjar/kiss-translator"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # ----------------------------------------------------
+      # 步骤 1: 镜像同步所有 Git 分支和标签
+      # ----------------------------------------------------
+      - name: Mirror Git Repository
+        run: |
+          echo "Cloning upstream repository as a mirror..."
+          git clone --mirror ${{ env.UPSTREAM_REPO }} upstream_mirror
+          
+          cd upstream_mirror
+          
+          echo "Setting push URL to destination repository..."
+          # 使用你配置的 PAT 进行认证
+          git remote set-url --push origin "https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git"
+          
+          echo "Pushing all branches and tags to destination..."
+          # --mirror 选项会推送所有引用（分支、标签等）
+          git push --mirror
+
+      # ----------------------------------------------------
+      # 步骤 2: 同步所有 Releases
+      # ----------------------------------------------------
+      - name: Sync Releases
+        env:
+          # 将 PAT 和 GitHub 默认令牌都设置为环境变量
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Fetching releases from upstream repository: ${{ env.UPSTREAM_REPO_NAME }}"
+          
+          # 获取源仓库的所有 Release 列表，并提取关键信息
+          # --json 指定了我们需要的字段：tagName, name, body, isPrerelease, publishedAt, assets
+          RELEASES=$(gh release list -R ${{ env.UPSTREAM_REPO_NAME }} --json tagName,name,body,isPrerelease,publishedAt,assets)
+          
+          # 使用 jq 工具解析 JSON 并逆序（从最旧的 Release 开始创建）
+          # 逆序可以避免因依赖关系或时间顺序导致的潜在问题
+          TAGS_TO_SYNC=$(echo "$RELEASES" | jq -r '.[].tagName' | tac)
+          
+          if [ -z "$TAGS_TO_SYNC" ]; then
+            echo "No releases found in the upstream repository. Skipping release sync."
+            exit 0
+          fi
+          
+          echo "Found releases for tags: $TAGS_TO_SYNC"
+
+          for tag in $TAGS_TO_SYNC; do
+            echo "Processing release for tag: $tag"
+            
+            # 检查目标仓库是否已存在该 Release
+            if gh release view "$tag" -R ${{ github.repository }} >/dev/null 2>&1; then
+              echo "Release for tag $tag already exists in the destination repository. Skipping."
+              continue
+            fi
+            
+            echo "Release for $tag does not exist. Creating..."
+            
+            # 从源仓库获取单个 Release 的详细信息
+            RELEASE_INFO=$(echo "$RELEASES" | jq --arg tag "$tag" '.[] | select(.tagName == $tag)')
+            
+            # 提取信息
+            RELEASE_NAME=$(echo "$RELEASE_INFO" | jq -r '.name')
+            RELEASE_BODY=$(echo "$RELEASE_INFO" | jq -r '.body')
+            IS_PRERELEASE=$(echo "$RELEASE_INFO" | jq -r '.isPrerelease')
+            
+            # 构建 gh release create 命令
+            GH_COMMAND="gh release create '$tag' --title '$RELEASE_NAME' --notes '$RELEASE_BODY'"
+            
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              GH_COMMAND="$GH_COMMAND --prerelease"
+            fi
+            
+            # 下载并上传附件
+            ASSETS=$(echo "$RELEASE_INFO" | jq -r '.assets[] | .name')
+            if [ -n "$ASSETS" ]; then
+              echo "Downloading assets for release $tag..."
+              # 创建一个临时目录存放附件
+              mkdir -p assets_temp
+              gh release download "$tag" -R ${{ env.UPSTREAM_REPO_NAME }} -D ./assets_temp -p "*"
+              
+              # 将下载的附件路径附加到创建命令中
+              for asset in assets_temp/*; do
+                GH_COMMAND="$GH_COMMAND '$asset'"
+              done
+            fi
+
+            echo "Executing: $GH_COMMAND"
+            
+            # 在目标仓库中创建 Release
+            eval "$GH_COMMAND"
+            
+            # 清理临时附件目录
+            rm -rf assets_temp
+            echo "Successfully created release for tag $tag in ${{ github.repository }}"
+            echo "---------------------------------"
+            # 短暂休眠，避免API速率限制
+            sleep 2
+          done
+          
+          echo "All releases have been synced."
