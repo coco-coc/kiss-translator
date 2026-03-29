@@ -29,7 +29,7 @@ import { apiTranslate } from "../apis";
 import { kissLog } from "./log";
 import { clearAllBatchQueue } from "./batchQueue";
 import { genTextClass } from "./style";
-import { createLoadingSVG } from "./svg";
+import { createLoadingSVG, createRetrySVG } from "./svg";
 import { shortcutRegister } from "./shortcut";
 import { tryDetectLang } from "./detect";
 import { trustedTypesHelper } from "./trustedTypes";
@@ -170,6 +170,7 @@ export class Translator {
     term: `${APP_LCNAME}-term`,
     br: `${APP_LCNAME}-br`,
     highlight: `${APP_LCNAME}-highlight`,
+    retry: `${APP_LCNAME}-retry`,
   };
 
   // 内置跳过翻译文本
@@ -1368,10 +1369,39 @@ export class Translator {
         }
       }
     } catch (err) {
-      // inner.textContent = `[失败]...`;
-      // todo: 失败重试按钮
       kissLog("translate group error: ", err.message);
-      this.#cleanupDirectTranslations(hostNode);
+      if (err.message === "Request terminated") {
+        this.#cleanupDirectTranslations(hostNode);
+        return;
+      }
+
+      // 失败重试按钮
+      try {
+        const wrapper = hostNode.querySelector(
+          `:scope > .${Translator.KISS_CLASS.warpper}:last-of-type`
+        );
+        if (wrapper) {
+          const inner = wrapper.querySelector(
+            `.${Translator.KISS_CLASS.inner}`
+          );
+          if (inner) {
+            inner.textContent = "";
+            const retryIcon = createRetrySVG();
+            retryIcon.classList.add(Translator.KISS_CLASS.retry);
+            retryIcon.addEventListener("click", (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              wrapper.remove();
+              this.#processedNodes.delete(hostNode);
+              this.#translateNodeGroup(nodes, hostNode, deLang);
+            });
+            inner.appendChild(retryIcon);
+          }
+        }
+      } catch (retryErr) {
+        kissLog("retry icon error: ", retryErr.message);
+        this.#cleanupDirectTranslations(hostNode);
+      }
     }
   }
 
