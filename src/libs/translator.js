@@ -285,7 +285,7 @@ export class Translator {
   static BUILTIN_IGNORE_SELECTOR = `address, area, audio, br, canvas, 
   data, datalist, embed, head, iframe, input, noscript, map, 
   object, option, param, picture, progress, 
-  select, script, style, track, textarea, template, 
+  select, script, style, svg, track, textarea, template, 
   video, wbr, .notranslate, [contenteditable='true'], [translate='no']`;
 
   #setting; // 设置选项
