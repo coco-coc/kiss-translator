@@ -482,10 +482,10 @@ export class Translator {
         .querySelectorAll("pre")
         .forEach(
           (pre) =>
-          (pre.innerHTML = pre.innerHTML?.replace(
-            /(?:\r\n|\r|\n)/g,
-            "<br />"
-          ))
+            (pre.innerHTML = pre.innerHTML?.replace(
+              /(?:\r\n|\r|\n)/g,
+              "<br />"
+            ))
         );
     }
 
@@ -653,7 +653,7 @@ export class Translator {
         if (
           this.#skipMoNodes.has(mutation.target) ||
           mutation.nextSibling?.tagName?.toLowerCase() ===
-          this.#translationTagName
+            this.#translationTagName
         ) {
           continue;
         }

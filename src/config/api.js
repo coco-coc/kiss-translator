@@ -18,6 +18,7 @@ export const INPUT_PLACE_DESCRIPTION = "{{description}}"; // 描述
 export const INPUT_PLACE_SUMMARY = "{{summary}}"; // 摘要
 export const INPUT_PLACE_KEY = "{{key}}"; // 占位符
 export const INPUT_PLACE_MODEL = "{{model}}"; // 占位符
+export const INPUT_PLACE_GLOSSARY = "{{glossary}}"; // 占位符
 
 // export const OPT_DICT_BAIDU = "Baidu";
 export const OPT_DICT_BING = "Bing";
@@ -484,6 +485,9 @@ Title: ${INPUT_PLACE_TITLE}
 Description: ${INPUT_PLACE_DESCRIPTION}
 Summary: ${INPUT_PLACE_SUMMARY}
 Tone: ${INPUT_PLACE_TONE}
+
+# Glossary (Terminology):
+${INPUT_PLACE_GLOSSARY}
 
 # Task
 Convert the input word-level timestamp JSON into a bilingual VTT file. Target Language: ${INPUT_PLACE_TO}.
