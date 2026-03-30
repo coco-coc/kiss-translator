@@ -235,7 +235,7 @@ function ApiFields({ apiSlug, isUserApi, deleteApi, copyApi }) {
     placetagFormat = "compact",
     region = "",
     sortOrder = 0,
-    // aiTerms = false,
+    aiTerms = "",
   } = formData;
 
   const keyHelper = useMemo(
@@ -451,6 +451,16 @@ function ApiFields({ apiSlug, isUserApi, deleteApi, copyApi }) {
             multiline
             maxRows={10}
           /> */}
+          <TextField
+            size="small"
+            label={i18n("ai_terms")}
+            helperText={i18n("ai_terms_helper")}
+            name="aiTerms"
+            value={aiTerms}
+            onChange={handleChange}
+            multiline
+            maxRows={10}
+          />
         </>
       )}
 

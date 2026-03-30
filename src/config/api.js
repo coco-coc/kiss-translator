@@ -534,7 +534,7 @@ const defaultApi = {
   tone: BUILTIN_STONES[0], // 翻译风格
   placeholder: BUILTIN_PLACEHOLDERS[0], // 占位符
   placetag: BUILTIN_PLACETAGS[0], // 占位标签
-  // aiTerms: false, // AI智能专业术语 （todo: 备用）
+  aiTerms: "", // AI智能专业术语 （todo: 备用）
   customHeader: "",
   customBody: "",
   reqHook: "", // request 钩子函数

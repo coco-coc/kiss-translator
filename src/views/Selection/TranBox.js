@@ -341,10 +341,7 @@ export default function TranBox(props) {
   const setFollowSelection = props.setFollowSelection;
 
   let realApiSlugs = props.tranboxSetting.apiSlugs;
-  if (
-    props.tranboxSetting.singleWordNoTrans &&
-    isValidWord(props.text)
-  ) {
+  if (props.tranboxSetting.singleWordNoTrans && isValidWord(props.text)) {
     // Do not call any translation APIs, rely solely on dictionaries/suggestions
     realApiSlugs = [];
   }

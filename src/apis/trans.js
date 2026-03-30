@@ -47,6 +47,7 @@ import {
   parseJsonObj,
   extractJson,
   stripMarkdownCodeBlock,
+  parseAITerms,
 } from "../libs/utils";
 import {
   parseStreamingSegments,
@@ -106,7 +107,8 @@ const genUserPrompt = ({
   nobatchUserPrompt,
   useBatchFetch,
   tone,
-  glossary,
+  glossary = {}, // 规则中的AI专业术语
+  aiTerms = "", // 接口中的AI专业术语
   from,
   to,
   fromLang,
@@ -122,9 +124,14 @@ const genUserPrompt = ({
 
     title && (promptObj.title = title);
     description && (promptObj.description = description);
-    glossary &&
-      Object.keys(glossary).length !== 0 &&
-      (promptObj.glossary = glossary);
+
+    // 合并规则与接口中的AI专业术语
+    if (aiTerms) {
+      const aiGlossary = parseAITerms(aiTerms);
+      glossary = { ...glossary, ...aiGlossary };
+    }
+
+    Object.keys(glossary).length !== 0 && (promptObj.glossary = glossary);
     tone && (promptObj.tone = tone);
 
     return JSON.stringify(promptObj);
@@ -787,6 +794,7 @@ export const genTransReq = async ({ reqHook, ...args }) => {
     toLang,
     texts,
     glossary,
+    aiTerms,
     customHeader,
     customBody,
     events,
@@ -806,39 +814,40 @@ export const genTransReq = async ({ reqHook, ...args }) => {
 
     args.systemPrompt = events
       ? genSubtitlePrompt({
-          subtitlePrompt,
-          from,
-          to,
-          fromLang,
-          toLang,
-          texts,
-          docInfo,
-          tone,
-        })
+        subtitlePrompt,
+        from,
+        to,
+        fromLang,
+        toLang,
+        texts,
+        docInfo,
+        tone,
+      })
       : genSystemPrompt({
-          systemPrompt: useBatchFetch ? systemPrompt : nobatchPrompt,
-          from,
-          to,
-          fromLang,
-          toLang,
-          texts,
-          docInfo,
-          tone,
-        });
+        systemPrompt: useBatchFetch ? systemPrompt : nobatchPrompt,
+        from,
+        to,
+        fromLang,
+        toLang,
+        texts,
+        docInfo,
+        tone,
+      });
     args.userPrompt = events
       ? JSON.stringify(events)
       : genUserPrompt({
-          nobatchUserPrompt,
-          useBatchFetch,
-          from,
-          to,
-          fromLang,
-          toLang,
-          texts,
-          docInfo,
-          tone,
-          glossary,
-        });
+        nobatchUserPrompt,
+        useBatchFetch,
+        from,
+        to,
+        fromLang,
+        toLang,
+        texts,
+        docInfo,
+        tone,
+        glossary,
+        aiTerms,
+      });
   }
 
   const {

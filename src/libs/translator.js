@@ -24,6 +24,7 @@ import {
   genEventName,
   truncateWords,
   escapeHTML,
+  parseAITerms,
 } from "./utils";
 import { apiTranslate } from "../apis";
 import { kissLog } from "./log";
@@ -430,7 +431,8 @@ export class Translator {
     );
 
     this.#parseTerms(this.#rule.terms);
-    this.#parseAITerms(this.#rule.aiTerms);
+    // this.#parseAITerms(this.#rule.aiTerms);
+    this.#glossary = parseAITerms(this.#rule.aiTerms);
     this.#createTextStyles();
 
     this.#boundMouseMoveHandler = this.#handleMouseMove.bind(this);
@@ -480,10 +482,10 @@ export class Translator {
         .querySelectorAll("pre")
         .forEach(
           (pre) =>
-            (pre.innerHTML = pre.innerHTML?.replace(
-              /(?:\r\n|\r|\n)/g,
-              "<br />"
-            ))
+          (pre.innerHTML = pre.innerHTML?.replace(
+            /(?:\r\n|\r|\n)/g,
+            "<br />"
+          ))
         );
     }
 
@@ -588,35 +590,35 @@ export class Translator {
     }
   }
 
-  #parseAITerms(termsString) {
-    if (!termsString || typeof termsString !== "string") return;
+  // #parseAITerms(termsString) {
+  //   if (!termsString || typeof termsString !== "string") return;
 
-    try {
-      this.#glossary = Object.fromEntries(
-        termsString
-          .split(/\n|;/)
-          .map((line) => {
-            const [k = "", v = ""] = line.split(",").map((s) => s.trim());
-            return [k, v];
-          })
-          .filter(([k]) => k)
-      );
-    } catch (err) {
-      kissLog("parse aiterms", err);
-    }
-  }
+  //   try {
+  //     this.#glossary = Object.fromEntries(
+  //       termsString
+  //         .split(/\n|;/)
+  //         .map((line) => {
+  //           const [k = "", v = ""] = line.split(",").map((s) => s.trim());
+  //           return [k, v];
+  //         })
+  //         .filter(([k]) => k)
+  //     );
+  //   } catch (err) {
+  //     kissLog("parse aiterms", err);
+  //   }
+  // }
 
-  // todo: 利用AI总结
-  #getDocDescription() {
-    try {
-      const meta = document.querySelector('meta[name="description"]');
-      const description = meta?.getAttribute("content") || "";
-      return truncateWords(description);
-    } catch (err) {
-      kissLog("get description", err);
-    }
-    return "";
-  }
+  // // todo: 利用AI总结
+  // #getDocDescription() {
+  //   try {
+  //     const meta = document.querySelector('meta[name="description"]');
+  //     const description = meta?.getAttribute("content") || "";
+  //     return truncateWords(description);
+  //   } catch (err) {
+  //     kissLog("get description", err);
+  //   }
+  //   return "";
+  // }
 
   // 监控翻译单元的可见性
   #createIntersectionObserver() {
@@ -651,7 +653,7 @@ export class Translator {
         if (
           this.#skipMoNodes.has(mutation.target) ||
           mutation.nextSibling?.tagName?.toLowerCase() ===
-            this.#translationTagName
+          this.#translationTagName
         ) {
           continue;
         }
