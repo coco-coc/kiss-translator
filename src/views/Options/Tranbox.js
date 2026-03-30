@@ -74,6 +74,7 @@ export default function Tranbox() {
     // extStyles = "",
     enDict = OPT_DICT_BING,
     enSug = OPT_SUG_YOUDAO,
+    blacklist = "",
   } = tranboxSetting;
 
   return (
@@ -381,6 +382,17 @@ export default function Tranbox() {
           maxRows={10}
           multiline
         /> */}
+
+        <TextField
+          size="small"
+          label={i18n("blacklist")}
+          helperText={i18n("pattern_helper")}
+          name="blacklist"
+          value={blacklist}
+          onChange={handleChange}
+          maxRows={10}
+          multiline
+        />
       </Stack>
     </Box>
   );

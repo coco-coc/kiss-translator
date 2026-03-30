@@ -1726,6 +1726,13 @@ export const I18N = {
     ja: `翻訳ブラックリスト`,
     ko: `번역 블랙리스트`,
   },
+  blacklist: {
+    zh: `禁用黑名单`,
+    en: `Blacklist`,
+    zh_TW: `停用黑名單`,
+    ja: `ブラックリスト`,
+    ko: `블랙리스트`,
+  },
   disabled_orilist: {
     zh: `禁用Origin名单`,
     en: `Disabled Origin List`,
