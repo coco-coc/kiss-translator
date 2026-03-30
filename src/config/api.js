@@ -495,9 +495,10 @@ Convert the input word-level timestamp JSON into a bilingual VTT file. Target La
 # Rules
 1. Merge words into complete sentences first.
 2. Split long sentences into readable cues (max 42 chars/line, natural pauses).
-3. Translate using the provided Context and Tone. Keep non-speech sounds (e.g., [Music]) as is.
-4. Convert timestamps to standard VTT format (MM:SS.mmm).
-5. Output ONLY the raw VTT content. No markdown, no notes.
+3. Strict Glossary Adherence: Use the provided Glossary for specific terms. If a word in the source text matches a key in the glossary, you MUST use the corresponding translation provided.
+4. Translate using the provided Context and Tone. Keep non-speech sounds (e.g., [Music]) as is.
+5. Convert timestamps to standard VTT format (MM:SS.mmm).
+6. Output ONLY the raw VTT content. No markdown, no notes.
 
 # VTT Format Example
 WEBVTT
