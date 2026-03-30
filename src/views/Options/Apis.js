@@ -11,6 +11,7 @@ import Typography from "@mui/material/Typography";
 import Accordion from "@mui/material/Accordion";
 import AccordionSummary from "@mui/material/AccordionSummary";
 import AccordionDetails from "@mui/material/AccordionDetails";
+import StarIcon from '@mui/icons-material/Star';
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import Alert from "@mui/material/Alert";
@@ -992,6 +993,11 @@ export default function Apis() {
                 onClick={() => handleMenuItemClick(apiOption.type)}
               >
                 {apiOption.label}
+                {
+                  API_SPE_TYPES.sponsors.has(apiOption.type) && (
+                    <StarIcon color="warning" sx={{ marginLeft: "0.2em" }} />
+                  )
+                }
               </MenuItem>
             ))}
           </Menu>
