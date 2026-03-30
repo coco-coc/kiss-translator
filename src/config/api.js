@@ -39,7 +39,7 @@ export const OPT_TRANS_AZUREAI = "AzureAI";
 export const OPT_TRANS_DEEPL = "DeepL";
 export const OPT_TRANS_DEEPLX = "DeepLX";
 export const OPT_TRANS_DEEPLFREE = "DeepLFree";
-export const OPT_TRANS_NIUTRANS = "NiuTrans";
+export const OPT_TRANS_EPHONEAI = "ePhoneAI";
 export const OPT_TRANS_BAIDU = "Baidu";
 export const OPT_TRANS_TENCENT = "Tencent";
 export const OPT_TRANS_VOLCENGINE = "Volcengine";
@@ -65,7 +65,7 @@ export const OPT_ALL_TRANS_TYPES = [
   OPT_TRANS_DEEPL,
   OPT_TRANS_DEEPLFREE,
   OPT_TRANS_DEEPLX,
-  OPT_TRANS_NIUTRANS,
+  OPT_TRANS_EPHONEAI,
   OPT_TRANS_OPENAI,
   OPT_TRANS_GEMINI,
   OPT_TRANS_GEMINI_2,
@@ -100,6 +100,7 @@ export const API_SPE_TYPES = {
   ]),
   // AI翻译
   ai: new Set([
+    OPT_TRANS_EPHONEAI,
     OPT_TRANS_OPENAI,
     OPT_TRANS_GEMINI,
     OPT_TRANS_GEMINI_2,
@@ -119,7 +120,7 @@ export const API_SPE_TYPES = {
     OPT_TRANS_CLOUDFLAREAI,
     OPT_TRANS_OLLAMA,
     OPT_TRANS_OPENROUTER,
-    OPT_TRANS_NIUTRANS,
+    OPT_TRANS_EPHONEAI,
     OPT_TRANS_CUSTOMIZE,
   ]),
   // 支持批处理
@@ -135,6 +136,7 @@ export const API_SPE_TYPES = {
     OPT_TRANS_CLAUDE,
     OPT_TRANS_OLLAMA,
     OPT_TRANS_OPENROUTER,
+    OPT_TRANS_EPHONEAI,
     OPT_TRANS_CUSTOMIZE,
   ]),
   // 支持上下文
@@ -145,6 +147,7 @@ export const API_SPE_TYPES = {
     OPT_TRANS_CLAUDE,
     OPT_TRANS_OLLAMA,
     OPT_TRANS_OPENROUTER,
+    OPT_TRANS_EPHONEAI,
     OPT_TRANS_CUSTOMIZE,
   ]),
   // 支持流式传输
@@ -155,6 +158,7 @@ export const API_SPE_TYPES = {
     OPT_TRANS_CLAUDE,
     OPT_TRANS_OLLAMA,
     OPT_TRANS_OPENROUTER,
+    OPT_TRANS_EPHONEAI,
   ]),
 };
 
@@ -269,12 +273,6 @@ export const OPT_LANGS_TO_SPEC = {
     ["zh-CN", "ZH"],
     ["zh-TW", "ZH"],
   ]),
-  [OPT_TRANS_NIUTRANS]: new Map([
-    ...OPT_LANGS_SPEC_DEFAULT,
-    ["auto", "auto"],
-    ["zh-CN", "zh"],
-    ["zh-TW", "cht"],
-  ]),
   [OPT_TRANS_VOLCENGINE]: new Map([
     ...OPT_LANGS_SPEC_DEFAULT,
     ["auto", "auto"],
@@ -330,6 +328,7 @@ export const OPT_LANGS_TO_SPEC = {
     ["id", "id"],
     ["vi", "vi"],
   ]),
+  [OPT_TRANS_EPHONEAI]: OPT_LANGS_SPEC_NAME,
   [OPT_TRANS_OPENAI]: OPT_LANGS_SPEC_NAME,
   [OPT_TRANS_GEMINI]: OPT_LANGS_SPEC_NAME,
   [OPT_TRANS_GEMINI_2]: OPT_LANGS_SPEC_NAME,
@@ -610,11 +609,9 @@ const defaultApiOpts = {
     ...defaultApi,
     url: "http://localhost:1188/translate",
   },
-  [OPT_TRANS_NIUTRANS]: {
+  [OPT_TRANS_EPHONEAI]: {
     ...defaultApi,
-    url: "https://api.niutrans.com/NiuTransServer/translation",
-    dictNo: "",
-    memoryNo: "",
+    url: "https://api.ephone.ai/v1/chat/completions",
   },
   [OPT_TRANS_OPENAI]: {
     ...defaultApi,

@@ -1852,13 +1852,6 @@ export const I18N = {
     ja: `Web修正セレクタ`,
     ko: `웹페이지 수정 선택자`,
   },
-  reg_niutrans: {
-    zh: `获取小牛翻译密钥【简约翻译专属新用户注册赠送300万字符】`,
-    en: `Get NiuTrans APIKey [KISS Translator Exclusive New User Registration Free 3 Million Characters]`,
-    zh_TW: `取得小牛翻譯金鑰【簡約翻譯專屬新用戶註冊贈送 300 萬字元】`,
-    ja: `NiuTrans APIキーを取得 [KISS翻訳 専用 新規ユーザー登録で300万文字無料]`,
-    ko: `NiuTrans API 키 받기 [KISS 번역기 신규 사용자 등록 시 300만 자 무료 제공]`,
-  },
   trigger_mode: {
     zh: `触发方式`,
     en: `Trigger Mode`,
