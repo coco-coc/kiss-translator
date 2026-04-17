@@ -29,12 +29,17 @@ export const fetchGM = async (
       timeout,
       onload: ({ response, responseHeaders, status, statusText }) => {
         const headers = {};
-        responseHeaders.split("\n").forEach((line) => {
-          const [name, value] = line.split(":").map((item) => item.trim());
-          if (name && value) {
-            headers[name] = value;
-          }
-        });
+        try {
+          responseHeaders && responseHeaders.split("\n").forEach((line) => {
+            const [name, value] = line.split(":").map((item) => item.trim());
+            if (name && value) {
+              headers[name] = value;
+            }
+          });
+        } catch (e) {
+          kissLog("fetchGM parse headers error", e);
+        }
+
         resolve({
           body: response,
           headers,
