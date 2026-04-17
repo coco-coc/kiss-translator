@@ -117,6 +117,7 @@ export class BilingualSubtitleManager {
   #videoEl;
   #formattedSubtitles = [];
   #captionWindowEl = null;
+  #captionDragged = false;
   #paperEl = null;
   #currentSubtitleIndex = -1;
   // #preTranslateSeconds = 90;
@@ -204,6 +205,50 @@ export class BilingualSubtitleManager {
   }
 
   /**
+   * 监听播放器控制条的显示状态，隐藏时将字幕下移
+   */
+  #observePlayerControlBar() {
+    const player = this.#videoEl.closest(".html5-video-player");
+    if (!player) return;
+
+    const controlBar = player.querySelector(".ytp-left-controls");
+    if (!controlBar) return;
+    const controlBarHeight = parseFloat(getComputedStyle(controlBar).height);
+
+    const getCurrentPaperElBottom = () => {
+      const bottom = getComputedStyle(this.#paperEl).bottom;
+      return parseFloat(bottom) || 0;
+    };
+
+    // 默认视字幕初始化完成时控制条为显示状态
+    let lastControlBarHiddenState = false;
+
+    const updatePaperElBottom = () => {
+      const isHidden = player.classList.contains("ytp-autohide");
+      if (isHidden === lastControlBarHiddenState) return;
+      lastControlBarHiddenState = isHidden;
+
+      const currentPaperElBottom = getCurrentPaperElBottom();
+      if (currentPaperElBottom === 0) return;
+
+      if (isHidden) {
+        this.#paperEl.style.bottom = `${currentPaperElBottom - controlBarHeight}px`;
+      } else {
+        this.#paperEl.style.bottom = `${currentPaperElBottom + controlBarHeight}px`;
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      if (!this.#captionDragged) updatePaperElBottom();
+    });
+
+    observer.observe(player, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+  }
+
+  /**
    * 创建并配置用于显示字幕的 DOM 元素。
    */
   #createCaptionWindow() {
@@ -257,7 +302,12 @@ export class BilingualSubtitleManager {
     const isEnhance =
       enhanceMode === "on" || (enhanceMode === "mobile_off" && !isMobile);
 
-    this.#enableDragging(this.#paperEl, container, this.#captionWindowEl);
+    this.#enableDragging(
+      this.#paperEl,
+      container,
+      this.#captionWindowEl,
+      () => (this.#captionDragged = true)
+    );
 
     if (isEnhance) {
       this.#captionWindowEl.addEventListener("pointerenter", (e) => {
@@ -283,6 +333,7 @@ export class BilingualSubtitleManager {
         }
       });
     }
+    this.#observePlayerControlBar();
   }
 
   // 处理单词悬停事件
@@ -523,7 +574,12 @@ export class BilingualSubtitleManager {
   /**
    * 为指定的元素启用垂直拖动功能。
    */
-  #enableDragging(dragElement, boundaryContainer, handleElement) {
+  #enableDragging(
+    dragElement,
+    boundaryContainer,
+    handleElement,
+    dragEndCallback
+  ) {
     let isDragging = false;
     let startY;
     let initialBottom;
@@ -571,6 +627,8 @@ export class BilingualSubtitleManager {
       }
 
       dragElement.style.bottom = `${newBottom}px`;
+      if (dragEndCallback && typeof dragEndCallback === "function")
+        dragEndCallback();
     };
 
     const onDragEnd = (e) => {
