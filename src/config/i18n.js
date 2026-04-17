@@ -350,11 +350,11 @@ export const I18N = {
     ko: `번역 간격 (1-2000ms)`,
   },
   http_timeout: {
-    zh: `请求超时时间 (100-6000000ms)`,
-    en: `Request Timeout Time (100-6000000ms)`,
+    zh: `请求超时时间 (100-600000ms)`,
+    en: `Request Timeout Time (100-600000ms)`,
     zh_TW: `請求逾時時間 (100-60000ms)`,
-    ja: `リクエストタイムアウト (100-6000000ms)`,
-    ko: `요청 시간 초과 (100-6000000ms)`,
+    ja: `リクエストタイムアウト (100-600000ms)`,
+    ko: `요청 시간 초과 (100-600000ms)`,
   },
   custom_header: {
     zh: `自定义Header参数`,
