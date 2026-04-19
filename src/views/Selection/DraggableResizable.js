@@ -254,8 +254,6 @@ export default function DraggableResizable({
         </Pointer>
         <Box
           className="KT-draggable-container"
-          onMouseUp={(e) => e.stopPropagation()}
-          onTouchEnd={(e) => e.stopPropagation()}
           sx={() => {
             const containerStyle = autoHeight
               ? {
