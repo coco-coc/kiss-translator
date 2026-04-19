@@ -415,10 +415,7 @@ export default function TranForm({
       )}
 
       {/* 如果是单个汉字 */}
-      {isSingleChineseChar(text) && (
-        <Zdic text={text} />
-      )}
-
+      {isSingleChineseChar(text) && <Zdic text={text} />}
     </Stack>
   );
 }
