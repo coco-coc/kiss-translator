@@ -171,9 +171,9 @@ export const setBdauth = (val) => setObj(STOKEY_BDAUTH, val);
 /**
  * 存入默认数据
  */
-export const tryInitDefaultData = async () => {
+export const tryInitDefaultData = async (uiLang) => {
   try {
-    await trySetObj(STOKEY_SETTING, DEFAULT_SETTING);
+    await trySetObj(STOKEY_SETTING, { ...DEFAULT_SETTING, uiLang });
     await trySetObj(STOKEY_RULES, DEFAULT_RULES);
     await trySetObj(STOKEY_SYNC, DEFAULT_SYNC);
     await trySetObj(
