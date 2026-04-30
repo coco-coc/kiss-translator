@@ -36,6 +36,12 @@ export const OPT_TRANS_GOOGLE = "Google";
 export const OPT_TRANS_GOOGLE_2 = "Google2";
 export const OPT_TRANS_MICROSOFT = "Microsoft";
 export const OPT_TRANS_AZUREAI = "AzureAI";
+export const OPT_TRANS_DEEPSEEK = "DeepSeek";
+export const OPT_TRANS_SILICONFLOW = "SiliconFlow";
+export const OPT_TRANS_XIAOMIMIMO = "XiaomiMimo";
+export const OPT_TRANS_ALIYUNBAILIAN = "AliyunBailian";
+export const OPT_TRANS_CEREBRAS = "Cerebras";
+export const OPT_TRANS_ZAI = "Zai";
 export const OPT_TRANS_DEEPL = "DeepL";
 export const OPT_TRANS_DEEPLX = "DeepLX";
 export const OPT_TRANS_DEEPLFREE = "DeepLFree";
@@ -60,6 +66,12 @@ export const OPT_ALL_TRANS_TYPES = [
   OPT_TRANS_MICROSOFT,
   OPT_TRANS_AZUREAI,
   // OPT_TRANS_BAIDU,
+  OPT_TRANS_DEEPSEEK,
+  OPT_TRANS_SILICONFLOW,
+  OPT_TRANS_XIAOMIMIMO,
+  OPT_TRANS_ALIYUNBAILIAN,
+  OPT_TRANS_CEREBRAS,
+  OPT_TRANS_ZAI,
   OPT_TRANS_TENCENT,
   OPT_TRANS_VOLCENGINE,
   OPT_TRANS_DEEPL,
@@ -102,6 +114,12 @@ export const API_SPE_TYPES = {
   ai: new Set([
     OPT_TRANS_EPHONEAI,
     OPT_TRANS_OPENAI,
+    OPT_TRANS_DEEPSEEK,
+    OPT_TRANS_SILICONFLOW,
+    OPT_TRANS_XIAOMIMIMO,
+    OPT_TRANS_ALIYUNBAILIAN,
+    OPT_TRANS_CEREBRAS,
+    OPT_TRANS_ZAI,
     OPT_TRANS_GEMINI,
     OPT_TRANS_GEMINI_2,
     OPT_TRANS_CLAUDE,
@@ -112,6 +130,12 @@ export const API_SPE_TYPES = {
   // 支持多key
   mulkeys: new Set([
     OPT_TRANS_AZUREAI,
+    OPT_TRANS_DEEPSEEK,
+    OPT_TRANS_SILICONFLOW,
+    OPT_TRANS_XIAOMIMIMO,
+    OPT_TRANS_ALIYUNBAILIAN,
+    OPT_TRANS_CEREBRAS,
+    OPT_TRANS_ZAI,
     OPT_TRANS_DEEPL,
     OPT_TRANS_OPENAI,
     OPT_TRANS_GEMINI,
@@ -126,6 +150,12 @@ export const API_SPE_TYPES = {
   // 支持批处理
   batch: new Set([
     OPT_TRANS_AZUREAI,
+    OPT_TRANS_DEEPSEEK,
+    OPT_TRANS_SILICONFLOW,
+    OPT_TRANS_XIAOMIMIMO,
+    OPT_TRANS_ALIYUNBAILIAN,
+    OPT_TRANS_CEREBRAS,
+    OPT_TRANS_ZAI,
     OPT_TRANS_GOOGLE_2,
     OPT_TRANS_MICROSOFT,
     OPT_TRANS_TENCENT,
@@ -141,6 +171,12 @@ export const API_SPE_TYPES = {
   ]),
   // 支持上下文
   context: new Set([
+    OPT_TRANS_DEEPSEEK,
+    OPT_TRANS_SILICONFLOW,
+    OPT_TRANS_XIAOMIMIMO,
+    OPT_TRANS_ALIYUNBAILIAN,
+    OPT_TRANS_CEREBRAS,
+    OPT_TRANS_ZAI,
     OPT_TRANS_OPENAI,
     OPT_TRANS_GEMINI,
     OPT_TRANS_GEMINI_2,
@@ -152,6 +188,12 @@ export const API_SPE_TYPES = {
   ]),
   // 支持流式传输
   stream: new Set([
+    OPT_TRANS_DEEPSEEK,
+    OPT_TRANS_SILICONFLOW,
+    OPT_TRANS_XIAOMIMIMO,
+    OPT_TRANS_ALIYUNBAILIAN,
+    OPT_TRANS_CEREBRAS,
+    OPT_TRANS_ZAI,
     OPT_TRANS_OPENAI,
     OPT_TRANS_GEMINI,
     OPT_TRANS_GEMINI_2,
@@ -275,6 +317,12 @@ export const OPT_LANGS_TO_SPEC = {
     ["zh-CN", "ZH"],
     ["zh-TW", "ZH"],
   ]),
+  [OPT_TRANS_DEEPSEEK]: OPT_LANGS_SPEC_NAME,
+  [OPT_TRANS_SILICONFLOW]: OPT_LANGS_SPEC_NAME,
+  [OPT_TRANS_XIAOMIMIMO]: OPT_LANGS_SPEC_NAME,
+  [OPT_TRANS_ALIYUNBAILIAN]: OPT_LANGS_SPEC_NAME,
+  [OPT_TRANS_CEREBRAS]: OPT_LANGS_SPEC_NAME,
+  [OPT_TRANS_ZAI]: OPT_LANGS_SPEC_NAME,
   [OPT_TRANS_VOLCENGINE]: new Map([
     ...OPT_LANGS_SPEC_DEFAULT,
     ["auto", "auto"],
@@ -606,6 +654,42 @@ const defaultApiOpts = {
   [OPT_TRANS_DEEPLFREE]: {
     ...defaultApi,
     fetchLimit: 1,
+  },
+  [OPT_TRANS_DEEPSEEK]: {
+    ...defaultApi,
+    url: "https://api.deepseek.com/chat/completions",
+    model: "deepseek-v4-flash",
+    useBatchFetch: true,
+  },
+  [OPT_TRANS_SILICONFLOW]: {
+    ...defaultApi,
+    url: "https://api.siliconflow.cn/v1/chat/completions",
+    model: "Pro/zai-org/GLM-4.7",
+    useBatchFetch: true,
+  },
+  [OPT_TRANS_XIAOMIMIMO]: {
+    ...defaultApi,
+    url: "https://api.xiaomimimo.com/v1/chat/completions",
+    model: "mimo-v2.5-pro",
+    useBatchFetch: true,
+  },
+  [OPT_TRANS_ALIYUNBAILIAN]: {
+    ...defaultApi,
+    url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    model: "qwen-plus",
+    useBatchFetch: true,
+  },
+  [OPT_TRANS_CEREBRAS]: {
+    ...defaultApi,
+    url: "https://api.cerebras.ai/v1/chat/completions",
+    model: "gpt-oss-120b",
+    useBatchFetch: true,
+  },
+  [OPT_TRANS_ZAI]: {
+    ...defaultApi,
+    url: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+    model: "glm-5.1",
+    useBatchFetch: true,
   },
   [OPT_TRANS_DEEPLX]: {
     ...defaultApi,
