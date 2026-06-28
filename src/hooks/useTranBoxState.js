@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { limitNumber } from "../libs/utils";
 import { isMobile } from "../libs/mobile";
 import { debouncePutTranBox, getTranBox } from "../libs/storage";
@@ -65,18 +65,20 @@ export default function useTranBoxState(tranboxSetting) {
   const defaultBoxHeight =
     isMobile || initSimpleStyle ? 200 : limitNumber(maxBoxHeight, 200, 600);
   const boxHeight = Math.min(defaultBoxHeight, maxBoxHeight);
-
-  // 面板尺寸状态管理 (w: 宽, h: 高)
-  const [boxSize, setBoxSize] = useState({
+  const initialBoxSizeRef = useRef({
     w: boxWidth,
     h: boxHeight,
   });
-
-  // 面板位置状态管理 (x: 左间距, y: 顶间距)
-  const [boxPosition, setBoxPosition] = useState({
+  const initialBoxPositionRef = useRef({
     x: (window.innerWidth - getTranBoxOuterWidth(boxWidth)) / 2,
     y: (window.innerHeight - getTranBoxOuterHeight(boxHeight)) / 2,
   });
+
+  // 面板尺寸状态管理 (w: 宽, h: 高)
+  const [boxSize, setBoxSize] = useState(initialBoxSizeRef.current);
+
+  // 面板位置状态管理 (x: 左间距, y: 顶间距)
+  const [boxPosition, setBoxPosition] = useState(initialBoxPositionRef.current);
 
   // 极简样式状态
   const [simpleStyle, setSimpleStyle] = useState(initSimpleStyle);
@@ -92,12 +94,12 @@ export default function useTranBoxState(tranboxSetting) {
         const { w, h, x, y } = (await getTranBox()) || {};
         const next = clampTranBoxBounds(
           {
-            w: w !== undefined ? w : boxWidth,
-            h: h !== undefined ? h : boxHeight,
+            w: w !== undefined ? w : initialBoxSizeRef.current.w,
+            h: h !== undefined ? h : initialBoxSizeRef.current.h,
           },
           {
-            x: x !== undefined ? x : boxPosition.x,
-            y: y !== undefined ? y : boxPosition.y,
+            x: x !== undefined ? x : initialBoxPositionRef.current.x,
+            y: y !== undefined ? y : initialBoxPositionRef.current.y,
           }
         );
 
