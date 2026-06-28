@@ -116,26 +116,28 @@ export default function MouseHoverSetting() {
           </Grid>
         </Box>
 
-        <Grid container spacing={2} columns={12}>
-          <Grid item xs={12} sm={12} md={4} lg={4}>
-            <TextField
-              fullWidth
-              select
-              size="small"
-              name="displayMode"
-              value={displayMode}
-              label={i18n("mousehover_display_mode")}
-              onChange={handleDisplayModeChange}
-            >
-              <MenuItem value={OPT_MOUSE_HOVER_DISPLAY_BILINGUAL}>
-                {i18n("mousehover_display_bilingual")}
-              </MenuItem>
-              <MenuItem value={OPT_MOUSE_HOVER_DISPLAY_BUBBLE}>
-                {i18n("mousehover_display_bubble")}
-              </MenuItem>
-            </TextField>
+        <Box>
+          <Grid container spacing={2} columns={12}>
+            <Grid item xs={12} sm={12} md={4} lg={4}>
+              <TextField
+                fullWidth
+                select
+                size="small"
+                name="displayMode"
+                value={displayMode}
+                label={i18n("mousehover_display_mode")}
+                onChange={handleDisplayModeChange}
+              >
+                <MenuItem value={OPT_MOUSE_HOVER_DISPLAY_BILINGUAL}>
+                  {i18n("mousehover_display_bilingual")}
+                </MenuItem>
+                <MenuItem value={OPT_MOUSE_HOVER_DISPLAY_BUBBLE}>
+                  {i18n("mousehover_display_bubble")}
+                </MenuItem>
+              </TextField>
+            </Grid>
           </Grid>
-        </Grid>
+        </Box>
 
         {displayMode === OPT_MOUSE_HOVER_DISPLAY_BUBBLE && (
           <TextField
