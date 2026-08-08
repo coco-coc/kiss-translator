@@ -2,15 +2,14 @@ import queryString from "query-string";
 import { fetchData } from "../libs/fetch";
 import {
   URL_CACHE_TRAN,
-  URL_CACHE_DELANG,
   URL_CACHE_BINGDICT,
   URL_CACHE_DICT,
   KV_SALT_SYNC,
   OPT_LANGS_TO_SPEC,
+  OPT_LANGS_FROM_SPEC,
   OPT_LANGS_SPEC_DEFAULT,
   API_SPE_TYPES,
   DEFAULT_API_SETTING,
-  OPT_TRANS_MICROSOFT,
   MSG_BUILTINAI_DETECT,
   MSG_BUILTINAI_TRANSLATE,
   OPT_TRANS_BUILTINAI,
@@ -29,7 +28,6 @@ import {
   buildSubtitleSystemPrompt,
   formatIndexSubtitleEvents,
   handleSummarize,
-  handleMicrosoftLangdetect,
 } from "./trans";
 import { getHttpCachePolyfill, putHttpCachePolyfill } from "../libs/cache";
 import { getBatchQueue } from "../libs/batchQueue";
@@ -170,13 +168,6 @@ export const apiFetchText = (url) =>
   fetchData(url, undefined, { expect: "text" });
 
 /**
- * 获取微软 Edge 翻译服务的授权凭证 Token。
- * @returns {Promise<string>} 微软接口所需的 Bearer Token 凭证字符串
- */
-export const apiMsAuth = async () =>
-  fetchData("https://edge.microsoft.com/translate/auth");
-
-/**
  * 谷歌语言识别 API。
  * @param {string} text 待识别的原文文本
  * @returns {Promise<string>} 识别出的 ISO 语言简写代码 (e.g. "en")
@@ -203,39 +194,6 @@ export const apiGoogleLangdetect = async (text) => {
   if (res?.src) {
     await putHttpCachePolyfill(input, init, res);
     return res.src;
-  }
-
-  return "";
-};
-
-/**
- * 微软 Edge 语言识别 API。
- * 支持在队列中进行高并发批处理合并（Batching）以及本地缓存。
- * @param {string} text 待识别的原文文本
- * @returns {Promise<string>} 语言简写代码
- */
-export const apiMicrosoftLangdetect = async (text) => {
-  const cacheOpts = { text, detector: OPT_TRANS_MICROSOFT };
-  const cacheInput = `${URL_CACHE_DELANG}?${queryString.stringify(cacheOpts)}`;
-
-  // 1. 优先读取本地网络缓存
-  const cache = await getHttpCachePolyfill(cacheInput);
-  if (cache) {
-    return cache;
-  }
-
-  // 2. 无缓存时，推入批量请求合并队列中（200ms 内的请求合并发送，每批最大 20 条）
-  const key = `${URL_CACHE_DELANG}_${OPT_TRANS_MICROSOFT}`;
-  const queue = getBatchQueue(key, handleMicrosoftLangdetect, {
-    batchInterval: 200,
-    batchSize: 20,
-    batchLength: 100000,
-  });
-  const lang = await queue.addTask(text);
-
-  if (lang) {
-    putHttpCachePolyfill(cacheInput, null, lang);
-    return lang;
   }
 
   return "";
@@ -637,7 +595,8 @@ export const apiTranslate = async ({
 
   const { apiType, apiSlug, useBatchFetch } = apiSetting;
   const langMap = OPT_LANGS_TO_SPEC[apiType] || OPT_LANGS_SPEC_DEFAULT;
-  const from = langMap.get(fromLang);
+  const fromMap = OPT_LANGS_FROM_SPEC[apiType] || langMap;
+  const from = fromMap.get(fromLang);
   const to = langMap.get(toLang);
   if (!to) {
     throw new Error(`The target lang: ${toLang} not support`);

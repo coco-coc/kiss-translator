@@ -41,7 +41,7 @@ import { useApiList, useApiItem } from "../../hooks/Api";
 import { useConfirm } from "../../hooks/Confirm";
 import { resolveApiPromptSettings } from "../../config/prompt";
 import { apiTranslate } from "../../apis";
-import { fetchModelList } from "../../libs/modelList";
+import { fetchModelCatalog } from "../../libs/modelList";
 import Box from "@mui/material/Box";
 import ReusableAutocomplete from "./ReusableAutocomplete";
 import ShowMoreButton from "./ShowMoreButton";
@@ -90,7 +90,8 @@ import {
   BUILTIN_PLACETAGS,
   OPT_TRANS_AZUREAI,
   THINKING_PARAM_MAP,
-  getGeminiThinkingDisableStrategy,
+  getThinkingCapability,
+  resolveThinkingStrategy,
   DEFAULT_NOBATCH_PROMPT_SLUG,
   DEFAULT_BATCH_PROMPT_SLUG,
   DEFAULT_SUBTITLE_PROMPT_SLUG,
@@ -312,6 +313,9 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
   const [formData, setFormData] = useState(() => api || {});
   const [showMore, setShowMore] = useState(false);
   const [modelOptions, setModelOptions] = useState([]);
+  const [modelThinkingCapabilities, setModelThinkingCapabilities] = useState(
+    {}
+  );
   const [modelListStatus, setModelListStatus] = useState("idle");
   const [modelListError, setModelListError] = useState("");
   const requestedModelListKeyRef = useRef("");
@@ -324,6 +328,7 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
   useLayoutEffect(() => {
     setShowMore(false);
     setModelOptions([]);
+    setModelThinkingCapabilities({});
     setModelListStatus("idle");
     setModelListError("");
     requestedModelListKeyRef.current = "";
@@ -365,6 +370,15 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
         newData.sortOrder = value ? 999 : 0;
       }
 
+      if (name === "model") {
+        const capabilities = modelThinkingCapabilities[value];
+        if (capabilities) {
+          newData.thinkingCapabilities = capabilities;
+        } else {
+          delete newData.thinkingCapabilities;
+        }
+      }
+
       return newData;
     });
   };
@@ -404,7 +418,18 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
   };
 
   const handleSave = () => {
-    update(activeFormData);
+    const nextFormData = { ...activeFormData };
+    if (
+      thinkingParam &&
+      nextFormData.thinkingEffort &&
+      nextFormData.thinkingEffort !== "_default" &&
+      !thinkingEfforts?.some(
+        (effort) => effort.value === nextFormData.thinkingEffort
+      )
+    ) {
+      nextFormData.thinkingEffort = "_default";
+    }
+    update(nextFormData);
     if (activeFormData.isDisabled || activeFormData.sortOrder === -1) {
       onCollapse?.();
     }
@@ -469,6 +494,7 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
     aiTerms = "",
     thinkingMode = "disabled",
     thinkingEffort = "_default",
+    thinkingCapabilities,
     batchPromptSlug = "",
     nobatchPromptSlug = "",
     subtitlePromptSlug = "",
@@ -480,14 +506,34 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
   useEffect(() => {
     setModelListStatus("idle");
     setModelListError("");
+    setModelThinkingCapabilities({});
     requestedModelListKeyRef.current = "";
   }, [modelListUrl, key]);
 
-  const thinkingParam = THINKING_PARAM_MAP[apiType];
+  const effectiveThinkingCapabilities =
+    modelThinkingCapabilities[model] || thinkingCapabilities;
+  const thinkingCapability = getThinkingCapability({
+    apiType,
+    model,
+    thinkingCapabilities: effectiveThinkingCapabilities,
+  });
+  const thinkingParam = THINKING_PARAM_MAP[apiType] && thinkingCapability;
+  const thinkingEfforts = thinkingCapability?.efforts;
+  const selectedThinkingEffort = thinkingEfforts?.some(
+    (effort) => effort.value === thinkingEffort
+  )
+    ? thinkingEffort
+    : "_default";
   const thinkingDisableStrategy =
-    thinkingMode === "disabled" &&
-    (apiType === OPT_TRANS_GEMINI || apiType === OPT_TRANS_GEMINI_2)
-      ? getGeminiThinkingDisableStrategy({ apiType, url, model })
+    thinkingMode === "disabled"
+      ? resolveThinkingStrategy({
+          apiType,
+          url,
+          model,
+          thinkingMode,
+          thinkingEffort,
+          thinkingCapabilities: effectiveThinkingCapabilities,
+        })
       : null;
   const selectedBatchPromptSlug = Object.prototype.hasOwnProperty.call(
     activeFormData,
@@ -572,19 +618,32 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
     setModelListError("");
 
     try {
-      const nextModelOptions = await fetchModelList({
+      const catalog = await fetchModelCatalog({
         apiType,
         modelListUrl,
         key,
         httpTimeout,
       });
+      const nextModelOptions = catalog.models;
       setModelOptions(nextModelOptions);
+      setModelThinkingCapabilities(catalog.thinkingCapabilities);
+      setFormData((prevData) => {
+        const baseData = prevData?.apiSlug === apiSlug ? prevData : api || {};
+        const capabilities = catalog.thinkingCapabilities[baseData.model];
+        const newData = { ...baseData };
+        if (capabilities) {
+          newData.thinkingCapabilities = capabilities;
+        } else {
+          delete newData.thinkingCapabilities;
+        }
+        return newData;
+      });
       setModelListStatus(nextModelOptions.length > 0 ? "success" : "empty");
     } catch (err) {
       setModelListStatus("error");
       setModelListError(err?.message || String(err));
     }
-  }, [apiSlug, apiType, httpTimeout, key, modelListStatus, modelListUrl]);
+  }, [api, apiSlug, apiType, httpTimeout, key, modelListStatus, modelListUrl]);
 
   return (
     <Stack spacing={3}>
@@ -712,25 +771,26 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
                   onChange={handleChange}
                 />
               </Grid>
-              {apiType !== OPT_TRANS_GEMINI && (
-                <Grid item xs={12} sm={12} md={6} lg={3}>
-                  <ValidationInput
-                    size="small"
-                    fullWidth
-                    label={"Temperature (0.0-2.0)"}
-                    type="number"
-                    name="temperature"
-                    value={temperature}
-                    onChange={handleChange}
-                    min={0.0}
-                    max={2.0}
-                    isFloat={true}
-                    inputProps={{
-                      step: 0.1,
-                    }}
-                  />
-                </Grid>
-              )}
+              {apiType !== OPT_TRANS_GEMINI &&
+                apiType !== OPT_TRANS_GEMINI_2 && (
+                  <Grid item xs={12} sm={12} md={6} lg={3}>
+                    <ValidationInput
+                      size="small"
+                      fullWidth
+                      label={"Temperature (0.0-2.0)"}
+                      type="number"
+                      name="temperature"
+                      value={temperature}
+                      onChange={handleChange}
+                      min={0.0}
+                      max={2.0}
+                      isFloat={true}
+                      inputProps={{
+                        step: 0.1,
+                      }}
+                    />
+                  </Grid>
+                )}
               <Grid item xs={12} sm={12} md={6} lg={3}>
                 <ValidationInput
                   size="small"
@@ -1110,25 +1170,23 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
                 <MenuItem value="enabled">
                   {i18n("thinking_mode_enabled")}
                 </MenuItem>
-                {thinkingParam.disableSupported !== false && (
-                  <MenuItem value="disabled">
-                    {i18n("thinking_mode_disabled")}
-                  </MenuItem>
-                )}
+                <MenuItem value="disabled">
+                  {i18n("thinking_mode_disabled")}
+                </MenuItem>
               </TextField>
             </Grid>
-            {thinkingMode === "enabled" && thinkingParam.efforts && (
+            {thinkingMode === "enabled" && thinkingEfforts && (
               <Grid item xs={12} sm={12} md={6} lg={3}>
                 <TextField
                   select
                   fullWidth
                   size="small"
                   name="thinkingEffort"
-                  value={thinkingEffort}
+                  value={selectedThinkingEffort}
                   label={i18n("thinking_effort")}
                   onChange={handleChange}
                 >
-                  {thinkingParam.efforts.map((e) => (
+                  {thinkingEfforts.map((e) => (
                     <MenuItem key={e.value} value={e.value}>
                       {e.label}
                     </MenuItem>

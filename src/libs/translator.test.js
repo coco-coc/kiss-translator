@@ -7,6 +7,7 @@ jest.mock("./msg", () => ({
 }));
 
 const { apiTranslate } = require("../apis");
+const { OPT_HIGHLIGHT_WORDS_BEFORETRANS } = require("../config/rules");
 const { Translator } = require("./translator");
 
 const flushAsync = async () => {
@@ -28,7 +29,7 @@ const hoverNode = async (node, x = 20, y = 20) => {
   await Promise.resolve();
 };
 
-function createTranslator(rule = {}, setting = {}) {
+function createTranslator(rule = {}, setting = {}, favWords = []) {
   return new Translator({
     rule: {
       transOpen: "true",
@@ -49,6 +50,7 @@ function createTranslator(rule = {}, setting = {}) {
       transApis: [],
       ...setting,
     },
+    favWords,
   });
 }
 
@@ -194,6 +196,75 @@ describe("Translator rule styles", () => {
     expect(requestedTexts.every((text) => text.trim())).toBe(true);
   });
 
+  test("trims source indentation before creating whitespace placeholders", async () => {
+    document.body.innerHTML =
+      '<main id="root"><span id="target">\n\t\t1. Overall Structure\n\t</span></main>';
+
+    createTranslator(
+      {
+        autoScan: "false",
+        selector: "#target",
+      },
+      { minLength: 0 }
+    );
+    await flushAsync();
+
+    expect(apiTranslate).toHaveBeenCalledTimes(1);
+    expect(apiTranslate.mock.calls[0][0].text).toBe("1. Overall Structure");
+  });
+
+  test("protects and restores internal newlines and tabs", async () => {
+    const sourceText = "First\tcolumn\nSecond line";
+    apiTranslate.mockImplementation(({ text }) =>
+      Promise.resolve({ trText: text, isSame: false })
+    );
+    document.body.innerHTML =
+      '<main id="root"><span id="target"></span></main>';
+    document.getElementById("target").textContent = sourceText;
+
+    createTranslator(
+      {
+        autoScan: "false",
+        selector: "#target",
+      },
+      { minLength: 0 }
+    );
+    await flushAsync();
+
+    const requestedText = apiTranslate.mock.calls[0][0].text;
+    const inner = document.querySelector(`.${Translator.KISS_CLASS.inner}`);
+
+    expect(requestedText).toBe("First{1}column{2}Second line");
+    expect(requestedText).not.toContain("\t");
+    expect(requestedText).not.toContain("\n");
+    expect(inner.textContent).toBe(sourceText);
+  });
+
+  test("keeps literal backslash-t text unchanged", async () => {
+    const sourceText = "Show \\t literally";
+    apiTranslate.mockImplementation(({ text }) =>
+      Promise.resolve({ trText: text, isSame: false })
+    );
+    document.body.innerHTML =
+      '<main id="root"><span id="target"></span></main>';
+    document.getElementById("target").textContent = sourceText;
+
+    createTranslator(
+      {
+        autoScan: "false",
+        selector: "#target",
+      },
+      { minLength: 0 }
+    );
+    await flushAsync();
+
+    const requestedText = apiTranslate.mock.calls[0][0].text;
+    const inner = document.querySelector(`.${Translator.KISS_CLASS.inner}`);
+
+    expect(requestedText).toBe(sourceText);
+    expect(inner.textContent).toBe(sourceText);
+  });
+
   test("still translates mixed inline text groups", async () => {
     apiTranslate.mockResolvedValue({
       trText: "Translated mixed inline content",
@@ -218,8 +289,68 @@ describe("Translator rule styles", () => {
     expect(apiTranslate).toHaveBeenCalled();
     expect(combinedRequestedText).toContain("Text");
     expect(combinedRequestedText).toContain("tail");
+    expect(
+      requestedTexts.some(
+        (text) => text.startsWith("Text ") && text.endsWith(" tail")
+      )
+    ).toBe(true);
     expect(wrapper).not.toBeNull();
     expect(wrapper.textContent).toBe("Translated mixed inline content");
+  });
+
+  test("keeps pre-translation highlights out of the translation request", async () => {
+    const sourceText = "A model evaluation security incident report";
+    document.body.innerHTML = '<main id="root"><p id="target"></p></main>';
+    document.getElementById("target").textContent = sourceText;
+
+    createTranslator(
+      {
+        autoScan: "false",
+        selector: "#target",
+        hasRichText: "true",
+        highlightWords: OPT_HIGHLIGHT_WORDS_BEFORETRANS,
+      },
+      { minLength: 0 },
+      ["incident"]
+    );
+    await flushAsync();
+
+    const highlight = document.querySelector(
+      `#target > .${Translator.KISS_CLASS.highlight}`
+    );
+
+    expect(highlight).not.toBeNull();
+    expect(highlight.textContent).toBe("incident");
+    expect(apiTranslate).toHaveBeenCalledTimes(1);
+    expect(apiTranslate.mock.calls[0][0].text).toBe(sourceText);
+  });
+
+  test("filters only extension highlights from rich text requests", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <p id="target">Review the <strong>incident response</strong> details</p>
+      </main>
+    `;
+
+    createTranslator(
+      {
+        autoScan: "false",
+        selector: "#target",
+        hasRichText: "true",
+        highlightWords: OPT_HIGHLIGHT_WORDS_BEFORETRANS,
+      },
+      { minLength: 0 },
+      ["incident"]
+    );
+    await flushAsync();
+
+    const requestedText = apiTranslate.mock.calls[0][0].text;
+    const highlight = document.querySelector(
+      `#target strong > .${Translator.KISS_CLASS.highlight}`
+    );
+
+    expect(highlight).not.toBeNull();
+    expect(requestedText).toBe("Review the <i1>incident response</i1> details");
   });
 
   test("continues scanning block children after processing mixed parent nodes", async () => {
