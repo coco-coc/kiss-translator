@@ -1351,7 +1351,7 @@ export class Translator {
     const target = event.target;
     if (
       target?.closest?.(
-        "input, textarea, select, button, a, [contenteditable='true'], [contenteditable='']"
+        "input, textarea, select, [contenteditable='true'], [contenteditable='']"
       )
     ) {
       return;
@@ -1414,23 +1414,30 @@ export class Translator {
           this.#hoverPointer.y
         );
         if (el) {
-          let node = el;
-          while (node && node !== document.body) {
-            if (this.#observedNodes.has(node)) {
-              targetNode = node;
-              break;
+          // 链接/按钮等可交互文字元素优先作为独立翻译目标，
+          // 避免跳转到其外层容器后翻译范围过大。
+          const atomic = this.#findAtomicHoldTarget(el);
+          if (atomic) {
+            targetNode = atomic;
+          } else {
+            let node = el;
+            while (node && node !== document.body) {
+              if (this.#observedNodes.has(node)) {
+                targetNode = node;
+                break;
+              }
+              node = node.parentElement;
             }
-            node = node.parentElement;
-          }
-          // 鼠标下的节点尚未被扫描/登记时，也直接使用该元素，
-          // 避免 Outlook 邮件正文等动态内容在初始化前触发时丢失目标。
-          if (
-            !targetNode &&
-            Translator.isElement(el) &&
-            el !== document.body &&
-            el !== document.documentElement
-          ) {
-            targetNode = el;
+            // 鼠标下的节点尚未被扫描/登记时，也直接使用该元素，
+            // 避免动态内容在初始化前触发时丢失目标。
+            if (
+              !targetNode &&
+              Translator.isElement(el) &&
+              el !== document.body &&
+              el !== document.documentElement
+            ) {
+              targetNode = el;
+            }
           }
         }
       } catch (err) {
@@ -1445,6 +1452,19 @@ export class Translator {
     // 鼠标悬停在译文容器上时，还原其所属的原始翻译单元
     if (targetNode.classList?.contains(Translator.KISS_CLASS.warpper)) {
       targetNode = targetNode.parentElement || targetNode;
+    }
+
+    // 链接、按钮等短文本元素即使未被常规扫描登记，也直接作为翻译单元处理；
+    // 这些元素通常位于导航/按钮等紧凑布局中，译文始终使用行内显示，
+    // 避免块级译文把单行导航撑成两行甚至被容器裁剪。
+    const atomicTarget = this.#findAtomicHoldTarget(targetNode);
+    if (atomicTarget) {
+      this.#toggleTargetNode(
+        atomicTarget,
+        true,
+        false
+      );
+      return;
     }
 
     const transMode =
@@ -1470,6 +1490,31 @@ export class Translator {
       return;
     }
     this.#toggleHoverBlock(area);
+  }
+
+  // 查找可作为独立翻译目标的链接/按钮等可交互文字元素。
+  // 按钮、链接、summary 等元素即使不在常规扫描范围内，
+  // 也允许通过按住左键单独翻译，便于处理图标旁文字、按钮文案等短文本。
+  #findAtomicHoldTarget(node) {
+    let current = node;
+    while (current && current !== document.body) {
+      if (Translator.isElement(current)) {
+        try {
+          if (
+            current.matches?.(
+              "button, a, [role='button'], [role='link'], summary"
+            ) &&
+            (current.textContent || "").trim()
+          ) {
+            return current;
+          }
+        } catch (err) {
+          // 忽略无效选择器
+        }
+      }
+      current = current.parentElement;
+    }
+    return null;
   }
 
   // 查找“翻译整个区域”模式下的区域容器。

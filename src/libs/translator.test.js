@@ -118,6 +118,7 @@ describe("Translator rule styles", () => {
   afterEach(() => {
     createdTranslators.forEach((translator) => translator.stop());
     createdTranslators.length = 0;
+    delete document.elementFromPoint;
     global.IntersectionObserver = originalIntersectionObserver;
     global.CSSStyleSheet = originalCSSStyleSheet;
     window.scrollBy = originalScrollBy;
@@ -2006,5 +2007,142 @@ describe("Translator rule styles", () => {
     expect(
       document.querySelector(`#title .${Translator.KISS_CLASS.inner}`)
     ).toBeNull();
+  });
+
+  test("holds to translate a link inside a widget container", async () => {
+    document.body.innerHTML = `
+      <div id="widget">
+        <svg id="icon" width="16" height="16"><path d="M0 0"/></svg>
+        <a id="link" href="#">darkwalker1212:feat/MouseHold</a>
+        had recent pushes 25 minutes ago
+      </div>
+    `;
+    const link = document.getElementById("link");
+    document.elementFromPoint = () => link;
+
+    createTranslator(
+      { transOpen: "false", rootsSelector: "body" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "area",
+        },
+      }
+    );
+
+    await hoverNode(link, 20, 20);
+    link.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#link .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+  });
+
+  test("holds to translate widget text next to a link", async () => {
+    document.body.innerHTML = `
+      <div id="widget">
+        <svg id="icon" width="16" height="16"><path d="M0 0"/></svg>
+        <a id="link" href="#">darkwalker1212:feat/MouseHold</a>
+        had recent pushes 25 minutes ago
+      </div>
+    `;
+    const widget = document.getElementById("widget");
+    document.elementFromPoint = () => widget;
+
+    createTranslator(
+      { transOpen: "false", rootsSelector: "body" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "area",
+        },
+      }
+    );
+
+    await hoverNode(widget, 20, 20);
+    widget.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#widget .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+  });
+
+  test("holds to translate a button", async () => {
+    document.body.innerHTML =
+      '<main id="root"><button id="btn">New branch</button></main>';
+    const btn = document.getElementById("btn");
+    document.elementFromPoint = () => btn;
+
+    createTranslator(
+      { transOpen: "false", rootsSelector: "body" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "area",
+        },
+      }
+    );
+
+    await hoverNode(btn, 20, 20);
+    btn.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#btn .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+    const wrapper = document.querySelector(
+      `#btn .${Translator.KISS_CLASS.warpper}`
+    );
+    expect(wrapper.style.display).toBe("");
   });
 });
