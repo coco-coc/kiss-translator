@@ -2405,7 +2405,7 @@ describe("Translator rule styles", () => {
     ).not.toBeNull();
   });
 
-  test("suppresses click after hold-to-translate on a link by default", async () => {
+  test("does not suppress click after hold-to-translate on a link by default", async () => {
     document.body.innerHTML = `
       <main id="root">
         <a id="link" href="#">darkwalker1212:feat/MouseHold</a>
@@ -2451,7 +2451,7 @@ describe("Translator rule styles", () => {
     });
     link.dispatchEvent(click);
 
-    expect(click.defaultPrevented).toBe(true);
+    expect(click.defaultPrevented).toBe(false);
   });
 
   test("does not suppress a quick click when the hold option is enabled", async () => {

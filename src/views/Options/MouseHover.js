@@ -129,7 +129,7 @@ export default function MouseHoverSetting() {
     mouseHoverHoldDelay = 800,
     mouseHoverTransMode = OPT_MOUSE_HOVER_TRANS_AREA,
     mouseHoverTransDisplay = OPT_MOUSE_HOVER_TRANS_DISPLAY_BLOCK,
-    mouseHoverPreventClick = true,
+    mouseHoverPreventClick = false,
     blacklist = "",
     displayMode = OPT_MOUSE_HOVER_DISPLAY_BILINGUAL,
     bubbleStyle = DEFAULT_MOUSE_HOVER_BUBBLE_STYLE,

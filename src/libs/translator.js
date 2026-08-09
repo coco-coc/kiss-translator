@@ -1377,8 +1377,9 @@ export class Translator {
     this.#mouseHoldActive = true;
     this.#mouseHoldTriggered = false;
     this.#mouseHoldSuppressClick = false;
-    this.#mouseHoldPreventClickEnabled =
-      this.#setting.mouseHoverSetting?.mouseHoverPreventClick ?? true;
+    this.#mouseHoldPreventClickEnabled = Boolean(
+      this.#setting.mouseHoverSetting?.mouseHoverPreventClick
+    );
     this.#mouseHoldInteractive = Boolean(
       target?.closest?.(
         "button, a, [role='button'], [role='link'], summary"
