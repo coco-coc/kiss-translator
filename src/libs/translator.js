@@ -1559,6 +1559,12 @@ export class Translator {
             ) &&
             (current.textContent || "").trim()
           ) {
+            // 链接/按钮内部只有块级内容时（如链接直接包裹 h2/p 等），
+            // 把它当作原子目标会导致内部块被分段规则跳过而翻译失败，
+            // 应退回由悬停登记的标题/段落节点处理。
+            if (!Translator.hasTextNode(current) && this.#hasBlockNode(current)) {
+              break;
+            }
             return current;
           }
         } catch (err) {

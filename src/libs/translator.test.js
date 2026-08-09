@@ -2182,6 +2182,67 @@ describe("Translator rule styles", () => {
     expect(wrapper.style.display).toBe("");
   });
 
+  test("holds to translate a headline wrapped by a link when autoScan is enabled", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <article>
+          <section>
+            <div data-testid="card-text-wrapper">
+              <div data-testid="anchor-inner-wrapper">
+                <a href="/news/articles/x" data-testid="internal-link">
+                  <div>
+                    <div>
+                      <h2 data-testid="card-headline">Israel rejects Trump plan for Gaza</h2>
+                    </div>
+                  </div>
+                </a>
+              </div>
+            </div>
+          </section>
+        </article>
+      </main>
+    `;
+    const h2 = document.querySelector("h2");
+    document.elementFromPoint = () => h2;
+
+    createTranslator(
+      { transOpen: "false", autoScan: "true", rootsSelector: "body" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    await hoverNode(h2, 20, 20);
+    h2.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+    await flushAsync();
+
+    expect(
+      document.querySelector(
+        `h2 .${Translator.KISS_CLASS.warpper} .${Translator.KISS_CLASS.inner}`
+      )
+    ).not.toBeNull();
+  });
+
   test("respects the target element selector when autoScan is disabled", async () => {
     document.body.innerHTML = `
       <main id="root">
