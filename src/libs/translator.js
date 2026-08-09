@@ -370,7 +370,11 @@ export class Translator {
   #boundMouseDownHandler = null; // 鼠标左键按下事件
   #boundMouseUpHandler = null; // 鼠标左键松开事件
   #boundMouseHoldMoveHandler = null; // 按住期间移动取消事件
+  #boundMouseHoldClickHandler = null; // 按住翻译后拦截点击的事件
   #boundCancelMouseHold = null; // 取消按住状态的绑定函数
+  #mouseHoldSuppressClick = false; // 本次按住翻译成功后是否阻止松开时的点击
+  #mouseHoldPreventClickEnabled = false; // 本次按住是否启用“阻止点击跳转”
+  #mouseHoldInteractive = false; // 按住起点是否位于链接/按钮等可交互元素上
   #hoveredNode = null; // 存储当前悬停的可翻译节点
   #hoverPointer = { x: 0, y: 0 }; // 最近一次鼠标位置，用于定位气泡
   #hoverPointerValid = false; // 是否已经收到过有效的 mousemove 坐标
@@ -1300,6 +1304,8 @@ export class Translator {
     this.#boundMouseUpHandler = (event) => this.#handleMouseHoldUp(event);
     this.#boundMouseHoldMoveHandler = (event) =>
       this.#handleMouseHoldMove(event);
+    this.#boundMouseHoldClickHandler = (event) =>
+      this.#handleMouseHoldClick(event);
     this.#boundCancelMouseHold = () => this.#cancelMouseHold();
 
     document.addEventListener(
@@ -1311,6 +1317,11 @@ export class Translator {
     document.addEventListener(
       "mousemove",
       this.#boundMouseHoldMoveHandler,
+      true
+    );
+    document.addEventListener(
+      "click",
+      this.#boundMouseHoldClickHandler,
       true
     );
     window.addEventListener("blur", this.#boundCancelMouseHold);
@@ -1333,6 +1344,11 @@ export class Translator {
       document.removeEventListener(
         "mousemove",
         this.#boundMouseHoldMoveHandler,
+        true
+      );
+      document.removeEventListener(
+        "click",
+        this.#boundMouseHoldClickHandler,
         true
       );
       window.removeEventListener("blur", this.#boundCancelMouseHold);
@@ -1360,6 +1376,15 @@ export class Translator {
     this.#cancelMouseHold();
     this.#mouseHoldActive = true;
     this.#mouseHoldTriggered = false;
+    this.#mouseHoldSuppressClick = false;
+    this.#mouseHoldPreventClickEnabled = Boolean(
+      this.#setting.mouseHoverSetting?.mouseHoverPreventClick
+    );
+    this.#mouseHoldInteractive = Boolean(
+      target?.closest?.(
+        "button, a, [role='button'], [role='link'], summary"
+      )
+    );
     this.#mouseHoldStartX = event.clientX;
     this.#mouseHoldStartY = event.clientY;
 
@@ -1370,6 +1395,9 @@ export class Translator {
       const selectionText = window.getSelection?.()?.toString()?.trim();
       if (selectionText) return;
       this.#mouseHoldTriggered = true;
+      if (this.#mouseHoldPreventClickEnabled && this.#mouseHoldInteractive) {
+        this.#mouseHoldSuppressClick = true;
+      }
       this.#handleMouseHoldToggle();
     }, this.#getMouseHoldDelay());
   }
@@ -1389,10 +1417,28 @@ export class Translator {
     if (moved) this.#cancelMouseHold();
   }
 
+  // 按住链接/按钮翻译成功后，松开时的点击不再触发跳转或按钮点击
+  #handleMouseHoldClick(event) {
+    if (!this.#mouseHoldSuppressClick) return;
+    this.#mouseHoldSuppressClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+  }
+
   // 取消按住左键触发的等待状态
   #cancelMouseHold() {
     this.#mouseHoldActive = false;
     this.#mouseHoldTriggered = false;
+    this.#mouseHoldPreventClickEnabled = false;
+    this.#mouseHoldInteractive = false;
+    if (this.#mouseHoldSuppressClick) {
+      // click 事件在 mouseup 之后同步触发，这里仅作为兜底清理，
+      // 避免窗口失焦等场景下标志残留导致下一次点击被误拦截。
+      setTimeout(() => {
+        this.#mouseHoldSuppressClick = false;
+      }, 0);
+    }
     if (this.#mouseHoldTimer) {
       clearTimeout(this.#mouseHoldTimer);
       this.#mouseHoldTimer = null;

@@ -2290,4 +2290,157 @@ describe("Translator rule styles", () => {
       document.querySelector(`#outside .${Translator.KISS_CLASS.inner}`)
     ).toBeNull();
   });
+
+  test("suppresses click after hold-to-translate on a link when enabled", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <a id="link" href="#">darkwalker1212:feat/MouseHold</a>
+      </main>
+    `;
+    const link = document.getElementById("link");
+    document.elementFromPoint = () => link;
+
+    createTranslator(
+      { transOpen: "false", rootsSelector: "body" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+          mouseHoverPreventClick: true,
+        },
+      }
+    );
+
+    await hoverNode(link, 20, 20);
+    link.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    link.dispatchEvent(click);
+
+    expect(click.defaultPrevented).toBe(true);
+    expect(
+      document.querySelector(`#link .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+  });
+
+  test("does not suppress click after hold-to-translate on a link by default", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <a id="link" href="#">darkwalker1212:feat/MouseHold</a>
+      </main>
+    `;
+    const link = document.getElementById("link");
+    document.elementFromPoint = () => link;
+
+    createTranslator(
+      { transOpen: "false", rootsSelector: "body" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    await hoverNode(link, 20, 20);
+    link.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    link.dispatchEvent(click);
+
+    expect(click.defaultPrevented).toBe(false);
+  });
+
+  test("does not suppress a quick click when the hold option is enabled", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <a id="link" href="#">darkwalker1212:feat/MouseHold</a>
+      </main>
+    `;
+    const link = document.getElementById("link");
+    document.elementFromPoint = () => link;
+
+    createTranslator(
+      { transOpen: "false", rootsSelector: "body" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+          mouseHoverPreventClick: true,
+        },
+      }
+    );
+
+    await hoverNode(link, 20, 20);
+    link.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    // 快速松开，未达到按住延迟
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    link.dispatchEvent(click);
+
+    expect(click.defaultPrevented).toBe(false);
+  });
 });
