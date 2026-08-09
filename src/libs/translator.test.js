@@ -2096,7 +2096,7 @@ describe("Translator rule styles", () => {
     ).not.toBeNull();
   });
 
-  test("holds to translate a button", async () => {
+  test("skips a button when the ignore selector includes button", async () => {
     document.body.innerHTML =
       '<main id="root"><button id="btn">New branch</button></main>';
     const btn = document.getElementById("btn");
@@ -2134,10 +2134,160 @@ describe("Translator rule styles", () => {
 
     expect(
       document.querySelector(`#btn .${Translator.KISS_CLASS.inner}`)
+    ).toBeNull();
+  });
+
+  test("translates a button when it is removed from the ignore selector", async () => {
+    document.body.innerHTML =
+      '<main id="root"><button id="btn">New branch</button></main>';
+    const btn = document.getElementById("btn");
+    document.elementFromPoint = () => btn;
+
+    createTranslator(
+      { transOpen: "false", rootsSelector: "body", ignoreSelector: "" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "area",
+        },
+      }
+    );
+
+    await hoverNode(btn, 20, 20);
+    btn.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#btn .${Translator.KISS_CLASS.inner}`)
     ).not.toBeNull();
     const wrapper = document.querySelector(
       `#btn .${Translator.KISS_CLASS.warpper}`
     );
     expect(wrapper.style.display).toBe("");
+  });
+
+  test("respects the target element selector when autoScan is disabled", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <p id="allowed">Allowed text</p>
+        <p id="blocked">Blocked text</p>
+      </main>
+    `;
+    const allowed = document.getElementById("allowed");
+    const blocked = document.getElementById("blocked");
+
+    createTranslator(
+      { transOpen: "false", autoScan: "false", selector: "#allowed" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    document.elementFromPoint = () => blocked;
+    await hoverNode(blocked, 20, 20);
+    blocked.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#blocked .${Translator.KISS_CLASS.inner}`)
+    ).toBeNull();
+
+    document.elementFromPoint = () => allowed;
+    await hoverNode(allowed, 20, 20);
+    allowed.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#allowed .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+  });
+
+  test("skips targets outside rule roots", async () => {
+    document.body.innerHTML = `
+      <main id="root"><p id="inside">Inside text</p></main>
+      <div id="outside">Outside text</div>
+    `;
+    const outside = document.getElementById("outside");
+    document.elementFromPoint = () => outside;
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    await hoverNode(outside, 20, 20);
+    outside.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#outside .${Translator.KISS_CLASS.inner}`)
+    ).toBeNull();
   });
 });

@@ -1454,18 +1454,25 @@ export class Translator {
       targetNode = targetNode.parentElement || targetNode;
     }
 
-    // 链接、按钮等短文本元素即使未被常规扫描登记，也直接作为翻译单元处理；
+    // 链接、按钮等短文本元素作为独立翻译单元处理；
     // 这些元素通常位于导航/按钮等紧凑布局中，译文始终使用行内显示，
     // 避免块级译文把单行导航撑成两行甚至被容器裁剪。
+    // 是否翻译仍遵循规则设置（不翻译节点选择器、根节点选择器、目标元素选择器等）。
     const atomicTarget = this.#findAtomicHoldTarget(targetNode);
     if (atomicTarget) {
-      this.#toggleTargetNode(
-        atomicTarget,
-        true,
-        false
-      );
-      return;
+      if (this.#isHoldTargetAllowed(atomicTarget)) {
+        this.#toggleTargetNode(atomicTarget, true, false);
+        return;
+      }
+      // 原子目标被规则排除时，回退到悬停时登记的容器/原文单元
+      targetNode = this.#hoveredNode;
+      if (targetNode?.classList?.contains(Translator.KISS_CLASS.warpper)) {
+        targetNode = targetNode.parentElement || targetNode;
+      }
     }
+
+    // 规则设置优先：不满足不翻译节点选择器/根节点/目标选择器时直接跳过
+    if (!this.#isHoldTargetAllowed(targetNode)) return;
 
     const transMode =
       this.#setting.mouseHoverSetting?.mouseHoverTransMode ||
@@ -1517,6 +1524,42 @@ export class Translator {
     return null;
   }
 
+  // 目标是否位于规则设置的根节点内（rootsSelector）
+  #isWithinRuleRoots(node) {
+    if (this.#rootNodes.size === 0) return true;
+    let el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    while (el) {
+      for (const root of this.#rootNodes) {
+        if (root === el || root.contains?.(el)) return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  // autoScan=false 时，目标必须匹配规则设置的目标元素选择器（selector）
+  #matchesRuleTargetSelector(node) {
+    if (this.#rule.autoScan !== "false") return true;
+    const selector = this.#rule.selector?.trim();
+    if (!selector) return true;
+    const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    if (!Translator.isElement(el)) return false;
+    try {
+      return Boolean(el.matches(selector));
+    } catch (err) {
+      return false;
+    }
+  }
+
+  // 按住左键翻译的目标是否允许翻译（遵循个人/订阅/全局规则设置）
+  #isHoldTargetAllowed(node) {
+    if (!node) return false;
+    if (node.closest?.(this.#ignoreSelector)) return false;
+    if (!this.#isWithinRuleRoots(node)) return false;
+    if (!this.#matchesRuleTargetSelector(node)) return false;
+    return true;
+  }
+
   // 查找“翻译整个区域”模式下的区域容器。
   // 使用两层限制：
   // 1) 优先找最近的 article/main/[role=main] 等文章框架（整篇文章）；
@@ -1541,7 +1584,8 @@ export class Translator {
         !parent ||
         parent === document.body ||
         parent === document.documentElement ||
-        parent.closest?.(this.#ignoreSelector)
+        parent.closest?.(this.#ignoreSelector) ||
+        !this.#isWithinRuleRoots(parent)
       ) {
         break;
       }
@@ -1589,6 +1633,10 @@ export class Translator {
   #toggleHoverBlock(container) {
     if (!this.#isInitialized) {
       this.#init();
+    }
+    // 区域容器必须在规则设置的根节点内，避免越界翻译
+    if (!this.#isWithinRuleRoots(container)) {
+      return;
     }
     this.#scanNode(container);
     const units = this.#collectHoverBlockUnits(container);
