@@ -1520,16 +1520,6 @@ export class Translator {
     // 规则设置优先：不满足不翻译节点选择器/根节点/目标选择器时直接跳过
     if (!this.#isHoldTargetAllowed(targetNode)) return;
 
-    // 容器内的文本全部位于块级子节点中时（如链接包裹 h1/span），
-    // 直接翻译容器会因块级子节点被分段规则切断而落空，
-    // 应下钻到最深层的文本容器（Yahoo 新闻标题等结构）。
-    if (!Translator.hasTextNode(targetNode)) {
-      const leaf = this.#findDeepestTextLeaf(targetNode);
-      if (leaf && leaf !== targetNode && this.#isHoldTargetAllowed(leaf)) {
-        targetNode = leaf;
-      }
-    }
-
     const transMode =
       this.#setting.mouseHoverSetting?.mouseHoverTransMode ||
       OPT_MOUSE_HOVER_TRANS_AREA;
@@ -1616,34 +1606,6 @@ export class Translator {
       return null;
     }
     return leaf;
-  }
-
-  // 查找容器内文本最长的深层文本叶子元素。
-  // 用于按住翻译的目标是外层容器、而真实文本在块级子节点内的情况。
-  #findDeepestTextLeaf(node) {
-    if (!Translator.isElement(node)) return null;
-    let best = null;
-    let bestLength = 0;
-    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-    let current;
-    while ((current = walker.nextNode())) {
-      const text = current.nodeValue?.trim() || "";
-      if (!text) continue;
-      if (current.parentElement?.closest?.(`.${Translator.KISS_CLASS.warpper}`)) {
-        continue;
-      }
-      if (text.length > bestLength) {
-        bestLength = text.length;
-        best = current.parentElement;
-      }
-    }
-    if (!best || best === node) return null;
-    if (
-      best.matches?.("button, a, [role='button'], [role='link'], summary")
-    ) {
-      return null;
-    }
-    return best;
   }
 
   // 目标是否位于规则设置的根节点内（rootsSelector）
