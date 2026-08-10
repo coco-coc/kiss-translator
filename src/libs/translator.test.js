@@ -2243,6 +2243,69 @@ describe("Translator rule styles", () => {
     ).not.toBeNull();
   });
 
+  test("holds to translate a Yahoo-style news title inside a wrapped link", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <ul>
+          <li>
+            <article>
+              <a href="https://news.yahoo.co.jp/pickup/6591226">
+                <div>
+                  <div>
+                    <h1>
+                      <span class="news-title">韓国サッカー性接待疑惑 捜査検討</span>
+                    </h1>
+                  </div>
+                </div>
+              </a>
+            </article>
+          </li>
+        </ul>
+      </main>
+    `;
+    const span = document.querySelector(".news-title");
+    document.elementFromPoint = () => span;
+
+    createTranslator(
+      { transOpen: "false", autoScan: "true", rootsSelector: "body" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    await hoverNode(span, 20, 20);
+    span.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+    await flushAsync();
+
+    expect(
+      span.querySelector(
+        `.${Translator.KISS_CLASS.warpper} .${Translator.KISS_CLASS.inner}`
+      )
+    ).not.toBeNull();
+    // 解除行数截断的 selectStyle 应写回到标题 span 自身
+    expect(span.getAttribute("style") || "").toContain("height: auto");
+  });
+
   test("respects the target element selector when autoScan is disabled", async () => {
     document.body.innerHTML = `
       <main id="root">
