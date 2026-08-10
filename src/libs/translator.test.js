@@ -2306,67 +2306,6 @@ describe("Translator rule styles", () => {
     expect(span.getAttribute("style") || "").toContain("height: auto");
   });
 
-  test("holds to translate a link that directly wraps a text span and restores on second hold", async () => {
-    document.body.innerHTML = `
-      <main id="root">
-        <a href="/news/1"><span class="news-title">韓国サッカー性接待疑惑 捜査検討</span></a>
-      </main>
-    `;
-    const span = document.querySelector(".news-title");
-    document.elementFromPoint = () => span;
-
-    createTranslator(
-      { transOpen: "false", autoScan: "true", rootsSelector: "body" },
-      {
-        preInit: true,
-        mouseHoverSetting: {
-          useMouseHover: true,
-          mouseHoverKey: [],
-          mouseHoverKey2: [],
-          mouseHoverKeyHold: true,
-          mouseHoverHoldDelay: 200,
-          mouseHoverTransMode: "paragraph",
-        },
-      }
-    );
-
-    const hold = async () => {
-      await hoverNode(span, 20, 20);
-      span.dispatchEvent(
-        new MouseEvent("mousedown", {
-          bubbles: true,
-          button: 0,
-          clientX: 20,
-          clientY: 20,
-        })
-      );
-      jest.advanceTimersByTime(200);
-      await flushAsync();
-      document.dispatchEvent(
-        new MouseEvent("mouseup", { bubbles: true, button: 0 })
-      );
-      await flushAsync();
-    };
-
-    await hold();
-
-    expect(
-      span.querySelector(
-        `.${Translator.KISS_CLASS.warpper} .${Translator.KISS_CLASS.inner}`
-      )
-    ).not.toBeNull();
-    expect(span.getAttribute("style") || "").toContain("height: auto");
-
-    // 再次按住：应还原译文
-    const wrapper = span.querySelector(`.${Translator.KISS_CLASS.warpper}`);
-    document.elementFromPoint = () => wrapper;
-    await hold();
-
-    expect(
-      span.querySelector(`.${Translator.KISS_CLASS.warpper}`)
-    ).toBeNull();
-  });
-
   test("respects the target element selector when autoScan is disabled", async () => {
     document.body.innerHTML = `
       <main id="root">

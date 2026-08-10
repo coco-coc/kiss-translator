@@ -1559,17 +1559,10 @@ export class Translator {
             ) &&
             (current.textContent || "").trim()
           ) {
-            // 链接/按钮内部没有直接文本时，优先定位最深层的文本容器，
-            // 让译文与解除截断的样式直接作用在真正的文本元素上
-            // （如 <a><span>标题</span></a>，Yahoo 新闻标题即此类结构）。
-            if (!Translator.hasTextNode(current)) {
-              const leaf = this.#findSingleTextLeaf(current);
-              if (leaf) return leaf;
-            }
             // 链接/按钮内部只有块级内容时（如链接直接包裹 h2/p 等），
             // 把它当作原子目标会导致内部块被分段规则跳过而翻译失败，
             // 应退回由悬停登记的标题/段落节点处理。
-            if (this.#hasBlockNode(current)) {
+            if (!Translator.hasTextNode(current) && this.#hasBlockNode(current)) {
               break;
             }
             return current;
@@ -1581,31 +1574,6 @@ export class Translator {
       current = current.parentElement;
     }
     return null;
-  }
-
-  // 查找可交互元素内唯一的非空文本叶子元素（行内文本容器）。
-  // 若内部已经存在译文容器，则返回译文宿主，保证再次按住时能正确还原。
-  #findSingleTextLeaf(node) {
-    if (!Translator.isElement(node)) return null;
-    const wrapper = node.querySelector?.(`.${Translator.KISS_CLASS.warpper}`);
-    if (wrapper?.parentElement && wrapper.parentElement !== node) {
-      return wrapper.parentElement;
-    }
-    let leaf = null;
-    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-    let current;
-    while ((current = walker.nextNode())) {
-      if (!current.nodeValue?.trim()) continue;
-      if (leaf) return null; // 存在多个非空文本节点时不下钻
-      leaf = current.parentElement;
-    }
-    if (!leaf || leaf === node) return null;
-    if (
-      leaf.matches?.("button, a, [role='button'], [role='link'], summary")
-    ) {
-      return null;
-    }
-    return leaf;
   }
 
   // 目标是否位于规则设置的根节点内（rootsSelector）
