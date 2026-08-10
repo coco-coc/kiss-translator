@@ -4,6 +4,8 @@ import {
   SETTINGS_VERSION_V2,
   SETTINGS_VERSION_V3,
   DEFAULT_SUBTITLE_SETTING,
+  OPT_TRANS_DEEPSEEK,
+  OPT_TRANS_OPENAI,
 } from "../config";
 import { getSettingWithDefault, runDataMigration } from "./storage";
 
@@ -106,6 +108,39 @@ describe("settings storage migration", () => {
     const setting = await getSettingWithDefault();
 
     expect(setting.subtitleSetting.chunkLength).toBe(2000);
+  });
+
+  test("normalizes legacy default thinking effort only in the loaded setting", async () => {
+    const storedSetting = {
+      version: SETTINGS_VERSION_V3,
+      transApis: [
+        {
+          apiSlug: "openai",
+          apiType: OPT_TRANS_OPENAI,
+          model: "gpt-5.6-sol",
+          thinkingMode: "enabled",
+          thinkingEffort: "_default",
+        },
+      ],
+    };
+    window.localStorage.setItem(STOKEY_SETTING, JSON.stringify(storedSetting));
+
+    const setting = await getSettingWithDefault();
+
+    expect(setting.transApis[0].thinkingEffort).toBeNull();
+    expect(readStoredJson(STOKEY_SETTING)).toEqual(storedSetting);
+  });
+
+  test("normalizes thinking settings for a fresh installation", async () => {
+    const setting = await getSettingWithDefault();
+    const deepseek = setting.transApis.find(
+      (api) => api.apiType === OPT_TRANS_DEEPSEEK
+    );
+
+    expect(deepseek).toMatchObject({
+      thinkingMode: "disabled",
+      thinkingEffort: null,
+    });
   });
 
   test("GM storage reports a clear error when GM APIs are unavailable", async () => {
