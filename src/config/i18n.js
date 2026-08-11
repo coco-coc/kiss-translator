@@ -1288,6 +1288,15 @@ export const I18N = {
     tr: `API'ler arasında düşünme parametreleri farklılık gösterir. Hata ile karşılaşırsanız lütfen "API Varsayılanı" seçeneğini kullanın.`,
     vi: 'The thinking parameters vary across APIs. If you encounter errors, please use the "API Default" option.',
   },
+  thinking_unknown_model_helper: {
+    zh: `无法识别当前模型支持的思考参数，本次请求不会发送思考设置。`,
+    en: `The current model's thinking parameters are unknown, so no thinking settings will be sent.`,
+    zh_TW: `無法識別目前模型支援的思考參數，本次請求不會傳送思考設定。`,
+    ja: `現在のモデルが対応する思考パラメータを識別できないため、思考設定は送信されません。`,
+    ko: `현재 모델의 사고 매개변수를 확인할 수 없어 사고 설정을 전송하지 않습니다.`,
+    tr: `Geçerli modelin düşünme parametreleri tanınmadığından düşünme ayarları gönderilmeyecek.`,
+    vi: `Không nhận diện được tham số suy luận của mô hình hiện tại nên yêu cầu sẽ không gửi cài đặt suy luận.`,
+  },
   gemini_thinking_minimum_helper: {
     zh: `当前模型不支持完全关闭思考，将自动使用最低思考级别。`,
     en: `This model cannot disable thinking completely and will use its lowest supported level.`,
