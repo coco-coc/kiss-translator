@@ -2,6 +2,7 @@ import queryString from "query-string";
 import {
   OPT_TRANS_GOOGLE,
   OPT_TRANS_GOOGLE_2,
+  OPT_TRANS_GOOGLE_CLOUD,
   OPT_TRANS_MICROSOFT,
   OPT_TRANS_AZUREAI,
   OPT_TRANS_DEEPL,
@@ -631,6 +632,21 @@ const genGoogle2 = ({ texts, from, to, url, key }) => {
   return { url, body, headers };
 };
 
+const genGoogleCloud = ({ texts, from, to, url, key }) => {
+  const body = {
+    q: texts,
+    target: to,
+    format: "html",
+    ...(from !== "auto" && { source: from }),
+  };
+  const headers = {
+    "Content-type": "application/json",
+    "X-Goog-Api-Key": key,
+  };
+
+  return { url, body, headers };
+};
+
 const genMicrosoft = ({ texts, from, to }) => {
   // Edge 前端内部端点：无需鉴权，Body 为纯字符串数组；from 留空表示自动检测。
   const params = queryString.stringify({
@@ -1167,6 +1183,7 @@ const genCustom = ({ texts, fromLang, toLang, url, key, useBatchFetch }) => {
 const genReqFuncs = {
   [OPT_TRANS_GOOGLE]: genGoogle,
   [OPT_TRANS_GOOGLE_2]: genGoogle2,
+  [OPT_TRANS_GOOGLE_CLOUD]: genGoogleCloud,
   [OPT_TRANS_MICROSOFT]: genMicrosoft,
   [OPT_TRANS_AZUREAI]: genAzureAI,
   [OPT_TRANS_DEEPL]: genDeepl,
@@ -1446,6 +1463,11 @@ export const parseTransRes = async (
       return [[res?.sentences?.map((item) => item.trans).join(" "), res?.src]];
     case OPT_TRANS_GOOGLE_2:
       return res?.[0]?.map((_, i) => [res?.[0]?.[i], res?.[1]?.[i]]);
+    case OPT_TRANS_GOOGLE_CLOUD:
+      return res?.data?.translations?.map((item) => [
+        item.translatedText,
+        item.detectedSourceLanguage,
+      ]);
     case OPT_TRANS_MICROSOFT:
     case OPT_TRANS_AZUREAI:
       return res?.map((item) => [
