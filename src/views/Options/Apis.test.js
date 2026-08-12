@@ -727,7 +727,9 @@ describe("Apis QwenMT fields", () => {
     expect(
       view.container.querySelector('input[name="modelListUrl"]')
     ).toBeNull();
-    expect(view.container.querySelector('input[name="temperature"]')).toBeNull();
+    expect(
+      view.container.querySelector('input[name="temperature"]')
+    ).toBeNull();
     expect(view.container.querySelector('input[name="maxTokens"]')).toBeNull();
     expect(
       view.container.querySelector('input[name="useBatchFetch"]')
