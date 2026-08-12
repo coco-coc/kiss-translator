@@ -50,6 +50,7 @@ export const OPT_SUG_MAP = new Set(OPT_SUG_ALL);
 export const OPT_TRANS_BUILTINAI = "BuiltinAI"; // 浏览器内置 Gemini AI 翻译
 export const OPT_TRANS_GOOGLE = "Google"; // 谷歌翻译服务
 export const OPT_TRANS_GOOGLE_2 = "Google2"; // 谷歌翻译 pa 网页 API (支持大批量 HTML)
+export const OPT_TRANS_GOOGLE_CLOUD = "GoogleCloud"; // Google Cloud Translation Basic API
 export const OPT_TRANS_MICROSOFT = "Microsoft"; // 微软翻译服务
 export const OPT_TRANS_AZUREAI = "AzureAI"; // 微软 Azure 翻译
 export const OPT_TRANS_DEEPSEEK = "DeepSeek"; // DeepSeek 深度求索 AI 翻译
@@ -81,6 +82,7 @@ export const OPT_ALL_TRANS_TYPES = [
   OPT_TRANS_BUILTINAI,
   OPT_TRANS_GOOGLE,
   OPT_TRANS_GOOGLE_2,
+  OPT_TRANS_GOOGLE_CLOUD,
   OPT_TRANS_MICROSOFT,
   OPT_TRANS_AZUREAI,
   // OPT_TRANS_BAIDU,
@@ -151,6 +153,7 @@ export const API_SPE_TYPES = {
   // 支持多 API Key 轮询/备用的引擎
   mulkeys: new Set([
     OPT_TRANS_AZUREAI,
+    OPT_TRANS_GOOGLE_CLOUD,
     OPT_TRANS_DEEPSEEK,
     OPT_TRANS_OPENCODEGO,
     OPT_TRANS_SILICONFLOW,
@@ -181,6 +184,7 @@ export const API_SPE_TYPES = {
     OPT_TRANS_CEREBRAS,
     OPT_TRANS_ZAI,
     OPT_TRANS_GOOGLE_2,
+    OPT_TRANS_GOOGLE_CLOUD,
     OPT_TRANS_MICROSOFT,
     OPT_TRANS_TENCENT,
     OPT_TRANS_DEEPL,
@@ -953,6 +957,7 @@ export const OPT_LANGS_TO_SPEC = {
   ]),
   [OPT_TRANS_GOOGLE]: OPT_LANGS_SPEC_DEFAULT,
   [OPT_TRANS_GOOGLE_2]: OPT_LANGS_SPEC_DEFAULT,
+  [OPT_TRANS_GOOGLE_CLOUD]: OPT_LANGS_SPEC_DEFAULT,
   [OPT_TRANS_MICROSOFT]: new Map([
     ...OPT_LANGS_SPEC_DEFAULT,
     ["auto", ""],
@@ -1408,6 +1413,11 @@ const defaultApiOpts = {
     useBatchFetch: true,
     placetag: "a",
     placetagFormat: "attribute",
+  },
+  [OPT_TRANS_GOOGLE_CLOUD]: {
+    ...defaultApi,
+    url: "https://translation.googleapis.com/language/translate/v2",
+    useBatchFetch: true,
   },
   [OPT_TRANS_MICROSOFT]: {
     ...defaultApi,
