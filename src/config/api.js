@@ -58,6 +58,7 @@ export const OPT_TRANS_OPENCODEGO = "OpenCodeGo"; // OpenCode Go AI 翻译订阅
 export const OPT_TRANS_SILICONFLOW = "SiliconFlow"; // 硅基流动 AI 翻译 (云端部署大模型)
 export const OPT_TRANS_XIAOMIMIMO = "XiaomiMimo"; // 小米米莫 AI 翻译
 export const OPT_TRANS_ALIYUNBAILIAN = "AliyunBailian"; // 阿里云百炼大模型翻译
+export const OPT_TRANS_QWENMT = "QwenMT"; // 阿里云百炼 Qwen-MT 专用翻译
 export const OPT_TRANS_CEREBRAS = "Cerebras"; // Cerebras AI 翻译极速推理服务
 export const OPT_TRANS_ZAI = "Zai"; // 智谱 AI 翻译服务
 export const OPT_TRANS_DEEPL = "DeepL"; // DeepL 官方专业翻译 API
@@ -91,6 +92,7 @@ export const OPT_ALL_TRANS_TYPES = [
   OPT_TRANS_SILICONFLOW,
   OPT_TRANS_XIAOMIMIMO,
   OPT_TRANS_ALIYUNBAILIAN,
+  OPT_TRANS_QWENMT,
   OPT_TRANS_CEREBRAS,
   OPT_TRANS_ZAI,
   OPT_TRANS_TENCENT,
@@ -130,6 +132,7 @@ export const API_SPE_TYPES = {
     OPT_TRANS_BAIDU,
     OPT_TRANS_TENCENT,
     OPT_TRANS_VOLCENGINE,
+    OPT_TRANS_QWENMT,
   ]),
   // 大语言模型 AI 翻译引擎
   ai: new Set([
@@ -159,6 +162,7 @@ export const API_SPE_TYPES = {
     OPT_TRANS_SILICONFLOW,
     OPT_TRANS_XIAOMIMIMO,
     OPT_TRANS_ALIYUNBAILIAN,
+    OPT_TRANS_QWENMT,
     OPT_TRANS_CEREBRAS,
     OPT_TRANS_ZAI,
     OPT_TRANS_DEEPL,
@@ -993,6 +997,10 @@ export const OPT_LANGS_TO_SPEC = {
   [OPT_TRANS_SILICONFLOW]: OPT_LANGS_SPEC_NAME,
   [OPT_TRANS_XIAOMIMIMO]: OPT_LANGS_SPEC_NAME,
   [OPT_TRANS_ALIYUNBAILIAN]: OPT_LANGS_SPEC_NAME,
+  [OPT_TRANS_QWENMT]: new Map([
+    ...OPT_LANGS_SPEC_NAME,
+    ["auto", "auto"],
+  ]),
   [OPT_TRANS_CEREBRAS]: OPT_LANGS_SPEC_NAME,
   [OPT_TRANS_ZAI]: OPT_LANGS_SPEC_NAME,
   [OPT_TRANS_VOLCENGINE]: new Map([
@@ -1480,6 +1488,11 @@ const defaultApiOpts = {
     modelListUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
     model: "qwen-plus",
     ...defaultAiApiOpts,
+  },
+  [OPT_TRANS_QWENMT]: {
+    ...defaultApi,
+    url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    model: "qwen-mt-flash",
   },
   [OPT_TRANS_CEREBRAS]: {
     ...defaultApi,
