@@ -375,6 +375,9 @@ export class Translator {
   #mouseHoldSuppressClick = false; // 本次按住翻译成功后是否阻止松开时的点击
   #mouseHoldPreventClickEnabled = false; // 本次按住是否启用“阻止点击跳转”
   #mouseHoldInteractive = false; // 按住起点是否位于链接/按钮等可交互元素上
+  #holdRequestConcurrency = 0; // 按住触发翻译的在途 API 请求数
+  #holdRequestWaiters = []; // 等待并发名额的翻译请求
+  #holdRequestLimit = 5; // 按住触发翻译的最大并发请求数
   #hoveredNode = null; // 存储当前悬停的可翻译节点
   #hoverPointer = { x: 0, y: 0 }; // 最近一次鼠标位置，用于定位气泡
   #hoverPointerValid = false; // 是否已经收到过有效的 mousemove 坐标
@@ -1783,9 +1786,32 @@ export class Translator {
       if (!this.#processedNodes.has(unit)) {
         this.#processNode(unit, {
           blockDisplay: this.#getMouseHoldBlockDisplay(),
+          limitConcurrency: true,
         });
       }
     });
+  }
+
+  // 并发限流：区域模式按住触发可能一次翻译几十个单元，
+  // 限制同时在途的 API 请求数，避免瞬间打满服务端限流配额。
+  #acquireHoldRequestSlot() {
+    if (this.#holdRequestConcurrency < this.#holdRequestLimit) {
+      this.#holdRequestConcurrency += 1;
+      // 快速路径直接返回 undefined，调用方同步继续，不引入额外微任务
+      return undefined;
+    }
+    return new Promise((resolve) => {
+      this.#holdRequestWaiters.push(resolve);
+    });
+  }
+
+  #releaseHoldRequestSlot() {
+    const next = this.#holdRequestWaiters.shift();
+    if (next) {
+      next(); // 名额直接转给下一个等待者，在途总数保持不变
+    } else {
+      this.#holdRequestConcurrency -= 1;
+    }
   }
 
   // 收集区域内最外层（互不包含）的已观察翻译单元
@@ -2772,6 +2798,8 @@ export class Translator {
     } = this.#setting;
     const parentNode = hostNode.parentElement;
     const hideOrigin = transOnly === "true";
+    // 在 try 外声明，供 catch 分支判断本译文容器是否已被还原移除
+    let wrapper = null;
 
     try {
       const [processedString, placeholderMap] = this.#serializeForTranslation(
@@ -2780,7 +2808,7 @@ export class Translator {
       );
       if (this.#isInvalidText(processedString)) return;
 
-      const wrapper = document.createElement(this.#translationTagName);
+      wrapper = document.createElement(this.#translationTagName);
       wrapper.className = `${Translator.KISS_CLASS.warpper} notranslate`;
 
       const inner = document.createElement(transTag);
@@ -2871,6 +2899,8 @@ export class Translator {
         ? (chunk) => {
             // 防过期控制，若本轮翻译请求已因用户点击关闭或被新请求覆盖，则立刻抛弃
             if (this.#runId !== currentRunId) return;
+            // 容器已被还原移除时同样停止流式写入，避免向脱离文档的节点空转渲染
+            if (!wrapper.isConnected) return;
             const { text, isComplete } = chunk;
             if (!text) return;
 
@@ -2892,8 +2922,27 @@ export class Translator {
         : null;
 
       // 2. 发起真实的翻译网络请求
-      const { trText: translatedText, isSame: isSameLang } =
-        await this.#translateFetch(processedString, deLang, onStreamChunk);
+      // 区域模式按住触发可能一次翻译几十个单元，先获取并发名额再发请求，
+      // 把同时在途的请求数限制在 #holdRequestLimit 内，避免打满服务端限流配额。
+      if (options.limitConcurrency) {
+        const wait = this.#acquireHoldRequestSlot();
+        if (wait) await wait;
+      }
+      let translatedText;
+      let isSameLang;
+      try {
+        const result = await this.#translateFetch(
+          processedString,
+          deLang,
+          onStreamChunk
+        );
+        translatedText = result.trText;
+        isSameLang = result.isSame;
+      } finally {
+        if (options.limitConcurrency) {
+          this.#releaseHoldRequestSlot();
+        }
+      }
 
       // 请求完成后，立刻注销多余的 RAF 定时监听器，防止内存泄漏
       if (rafId) {
@@ -2904,6 +2953,12 @@ export class Translator {
       if (this.#runId !== currentRunId) {
         throw new Error("Request terminated");
       }
+
+      // 还原/清理（如区域模式按住第二次）可能已把本译文容器从文档移除，
+      // 此时丢弃过期结果：继续执行会把包裹/隐藏原文等 DOM 变更作用到已还原的
+      // 原文上（仅译文模式下原文会被搬走消失），并把脱离文档的 wrapper 重新
+      // 登记进 #translationNodes 造成状态泄漏。
+      if (!wrapper.isConnected) return;
 
       // 如果翻译文本为空，或者识别出来的源语言与目标语言一致，则移除临时的翻译 Loading 容器
       if (!translatedText || isSameLang) {
@@ -2986,6 +3041,11 @@ export class Translator {
         }
       }
     } catch (err) {
+      // 容器已被还原移除时丢弃过期失败结果，避免 “Request terminated” 分支的
+      // #cleanupDirectTranslations(hostNode) 误删宿主上随后产生的新译文，
+      // 也避免在已脱离文档的容器里渲染重试按钮。
+      if (wrapper && !wrapper.isConnected) return;
+
       const errorText = this.#formatTranslateError(err);
       kissLog("translate group error: ", errorText);
       if (err?.message === "Request terminated") {
@@ -2995,18 +3055,18 @@ export class Translator {
 
       // 失败重试按钮
       try {
-        const wrapper = hostNode.querySelector(
+        const lastWrapper = hostNode.querySelector(
           `:scope > .${Translator.KISS_CLASS.warpper}:last-of-type`
         );
-        if (wrapper) {
-          const inner = wrapper.querySelector(
+        if (lastWrapper) {
+          const inner = lastWrapper.querySelector(
             `.${Translator.KISS_CLASS.inner}`
           );
           if (inner) {
             inner.textContent = "";
             const retryNode = this.#createRetryErrorNode(errorText, () => {
               this.#withViewportAnchor(() => {
-                wrapper.remove();
+                lastWrapper.remove();
               });
               this.#processedNodes.delete(hostNode);
               this.#translateNodeGroup(nodes, hostNode, deLang, options);
