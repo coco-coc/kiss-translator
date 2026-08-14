@@ -1298,6 +1298,20 @@ export class Translator {
     return display !== OPT_MOUSE_HOVER_TRANS_DISPLAY_INLINE;
   }
 
+  // 纯触屏设备（主输入设备不支持悬停）上“按住鼠标左键”没有对应语义，
+  // 长按会触发系统菜单/选词，容易误触发翻译，因此不注册按住监听。
+  // matchMedia 不可用或抛错时（极旧环境）默认启用。
+  #isHoldSupportedByDevice() {
+    try {
+      return (
+        typeof window.matchMedia !== "function" ||
+        window.matchMedia("(hover: hover)").matches
+      );
+    } catch (err) {
+      return true;
+    }
+  }
+
   // 注册“按住鼠标左键不放”触发翻译/还原的监听
   #registerMouseHoldHandler() {
     if (this.#removeMouseHoldHandlers) return;
@@ -1332,6 +1346,18 @@ export class Translator {
       "visibilitychange",
       this.#boundCancelMouseHold
     );
+    // 触摸手势被浏览器接管（按住后滚动/系统手势）时取消，避免残留状态触发翻译
+    document.addEventListener(
+      "pointercancel",
+      this.#boundCancelMouseHold,
+      true
+    );
+    // 按住期间弹出右键/移动端长按菜单时取消
+    document.addEventListener(
+      "contextmenu",
+      this.#boundCancelMouseHold,
+      true
+    );
 
     this.#removeMouseHoldHandlers = () => {
       document.removeEventListener(
@@ -1358,6 +1384,16 @@ export class Translator {
       document.removeEventListener(
         "visibilitychange",
         this.#boundCancelMouseHold
+      );
+      document.removeEventListener(
+        "pointercancel",
+        this.#boundCancelMouseHold,
+        true
+      );
+      document.removeEventListener(
+        "contextmenu",
+        this.#boundCancelMouseHold,
+        true
       );
       this.#removeMouseHoldHandlers = null;
       this.#boundCancelMouseHold = null;
@@ -3938,7 +3974,7 @@ overflow-wrap: anywhere !important;`;
       mouseHoverKey2Hold = false,
     } = this.#setting.mouseHoverSetting;
     const hasMouseHold = mouseHoverKeyHold || mouseHoverKey2Hold;
-    if (hasMouseHold) {
+    if (hasMouseHold && this.#isHoldSupportedByDevice()) {
       this.#registerMouseHoldHandler();
     }
     if (

@@ -81,6 +81,7 @@ describe("Translator rule styles", () => {
   let originalCSSStyleSheet;
   let originalScrollBy;
   let originalChrome;
+  let originalMatchMedia;
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -111,6 +112,20 @@ describe("Translator rule styles", () => {
     window.scrollBy = jest.fn();
 
     originalChrome = globalThis.chrome;
+
+    // 默认模拟可悬停设备，保证按住触发测试正常运行；
+    // 个别用例按查询串覆写（如纯触屏设备场景）。
+    originalMatchMedia = window.matchMedia;
+    window.matchMedia = jest.fn((query) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }));
   });
 
   afterEach(() => {
@@ -121,6 +136,7 @@ describe("Translator rule styles", () => {
     global.CSSStyleSheet = originalCSSStyleSheet;
     window.scrollBy = originalScrollBy;
     globalThis.chrome = originalChrome;
+    window.matchMedia = originalMatchMedia;
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
     jest.clearAllMocks();
@@ -2029,6 +2045,110 @@ describe("Translator rule styles", () => {
     document.dispatchEvent(
       new MouseEvent("mouseup", { bubbles: true, button: 0 })
     );
+  });
+
+  test("cancels pending hold translation on pointercancel and contextmenu", async () => {
+    document.body.innerHTML =
+      '<main id="root"><p id="target">Hold target</p></main>';
+    const target = document.getElementById("target");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+        },
+      }
+    );
+
+    await hoverNode(target, 20, 20);
+
+    // pointercancel（触摸手势被浏览器接管）取消按住
+    target.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    jest.advanceTimersByTime(400);
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+
+    // contextmenu（右键/移动端长按菜单）取消按住
+    target.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    document.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true })
+    );
+    jest.advanceTimersByTime(400);
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+  });
+
+  test("does not register hold handlers on touch-only devices", async () => {
+    window.matchMedia.mockImplementation((query) => ({
+      matches: query !== "(hover: hover)",
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }));
+    document.body.innerHTML =
+      '<main id="root"><p id="target">Hold target</p></main>';
+    const target = document.getElementById("target");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+        },
+      }
+    );
+
+    await hoverNode(target, 20, 20);
+    target.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(500);
+    await flushAsync();
+
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
   });
 
   test("caps concurrent hold-triggered whole-area requests and drains the queue", async () => {
