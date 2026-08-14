@@ -16,6 +16,7 @@ import {
   OPT_MOUSE_HOVER_TRANS_DISPLAY_BLOCK,
   OPT_MOUSE_HOVER_TRANS_DISPLAY_INLINE,
   OPT_MOUSE_HOVER_TRANS_PARAGRAPH,
+  OPT_MOUSE_HOVER_TRANS_REGION,
   OPT_SPLIT_PARAGRAPH_PUNCTUATION,
   OPT_SPLIT_PARAGRAPH_DISABLE,
   OPT_SPLIT_PARAGRAPH_TEXTLENGTH,
@@ -1585,7 +1586,7 @@ export class Translator {
       return;
     }
 
-    const area = this.#findMouseHoverAreaNode(targetNode);
+    const area = this.#findMouseHoverAreaNode(targetNode, transMode);
     if (!area || area === targetNode) {
       this.#toggleTargetNode(
         targetNode,
@@ -1726,11 +1727,12 @@ export class Translator {
 
   // 查找“翻译整个区域”模式下的区域容器。
   // 使用两层限制：
-  // 1) 优先找最近的 article/main/[role=main] 等文章框架（整篇文章）；
-  // 2) 没有文章框架时，找“最近的、包含多个文字块”的容器，
-  //    在 Outlook 中即邮件正文容器本身，不会把上方标题栏圈进来。
-  // 最后才退回鼠标上方最外层块级容器。
-  #findMouseHoverAreaNode(node) {
+  // 按住左键区域翻译的目标容器定位：
+  // - 翻译整篇文章（area）：优先最近的 article/main/[role=main] 等文章框架；
+  // - 翻译最近区域（region）：优先“最近的、包含多个文字块”的容器，
+  //   在 Outlook 中即邮件正文容器本身，不会把上方标题栏圈进来；
+  // 两种模式下未命中时都退回鼠标上方最外层块级容器。
+  #findMouseHoverAreaNode(node, scopeMode = OPT_MOUSE_HOVER_TRANS_AREA) {
     let el = node;
     if (el?.nodeType === Node.TEXT_NODE) {
       el = el.parentElement;
@@ -1763,7 +1765,11 @@ export class Translator {
       topmostBlock = parent;
       current = parent;
     }
-    // 语义化文章容器优先；其次是最近的“多段落区域”（邮件正文等）；最后才退回最外层块级容器
+    if (scopeMode === OPT_MOUSE_HOVER_TRANS_REGION) {
+      // 最近区域优先
+      return multi || strong || topmostBlock;
+    }
+    // 整篇文章优先
     return strong || multi || topmostBlock;
   }
 

@@ -2536,7 +2536,7 @@ describe("Translator rule styles", () => {
     expect(wrapper.style.margin).toBe("");
   });
 
-  test("prefers the article container as the whole-area scope", async () => {
+  test("translates the whole flat article area and leaves the sidebar untouched", async () => {
     document.body.innerHTML = `
       <main id="root">
         <article id="post">
@@ -2584,6 +2584,132 @@ describe("Translator rule styles", () => {
     expect(
       document.querySelector(`#sidebar .${Translator.KISS_CLASS.inner}`)
     ).toBeNull();
+  });
+
+  test("translates the nearest nested region in region scope mode", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <article id="post">
+          <p id="intro">Intro paragraph</p>
+          <section id="group">
+            <p id="first">First paragraph</p>
+            <p id="second">Second paragraph</p>
+          </section>
+          <p id="outro">Outro paragraph</p>
+        </article>
+      </main>
+    `;
+    const first = document.getElementById("first");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "region",
+        },
+      }
+    );
+
+    await hoverNode(first, 20, 20);
+    first.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    // 只翻译最近的嵌套区域（section#group），不扩到整篇文章
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.inner}`)
+    ).toHaveLength(2);
+    expect(
+      document.querySelector(`#group #first .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+    expect(
+      document.querySelector(`#group #second .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+    expect(
+      document.querySelector(`#intro .${Translator.KISS_CLASS.inner}`)
+    ).toBeNull();
+    expect(
+      document.querySelector(`#outro .${Translator.KISS_CLASS.inner}`)
+    ).toBeNull();
+  });
+
+  test("translates the whole article in area scope mode when paragraphs are nested in a section", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <article id="post">
+          <p id="intro">Intro paragraph</p>
+          <section id="group">
+            <p id="first">First paragraph</p>
+            <p id="second">Second paragraph</p>
+          </section>
+          <p id="outro">Outro paragraph</p>
+        </article>
+      </main>
+    `;
+    const first = document.getElementById("first");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "area",
+        },
+      }
+    );
+
+    await hoverNode(first, 20, 20);
+    first.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    // 区域模式优先整篇文章：嵌套结构下的段落也全部翻译
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.inner}`)
+    ).toHaveLength(4);
+    expect(
+      document.querySelector(`#intro .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+    expect(
+      document.querySelector(`#first .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+    expect(
+      document.querySelector(`#second .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
+    expect(
+      document.querySelector(`#outro .${Translator.KISS_CLASS.inner}`)
+    ).not.toBeNull();
   });
 
   test("translates direct text and block children of a mixed mail body container", async () => {

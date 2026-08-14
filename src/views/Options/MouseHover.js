@@ -19,6 +19,7 @@ import {
   OPT_MOUSE_HOVER_TRANS_DISPLAY_INLINE,
   OPT_MOUSE_HOVER_TRANS_AREA,
   OPT_MOUSE_HOVER_TRANS_PARAGRAPH,
+  OPT_MOUSE_HOVER_TRANS_REGION,
 } from "../../config";
 
 /**
@@ -236,6 +237,9 @@ export default function MouseHoverSetting() {
           >
             <MenuItem value={OPT_MOUSE_HOVER_TRANS_PARAGRAPH}>
               {i18n("mousehover_hold_scope_paragraph")}
+            </MenuItem>
+            <MenuItem value={OPT_MOUSE_HOVER_TRANS_REGION}>
+              {i18n("mousehover_hold_scope_region")}
             </MenuItem>
             <MenuItem value={OPT_MOUSE_HOVER_TRANS_AREA}>
               {i18n("mousehover_hold_scope_area")}
