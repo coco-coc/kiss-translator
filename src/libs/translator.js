@@ -378,6 +378,7 @@ export class Translator {
   #holdRequestConcurrency = 0; // 按住触发翻译的在途 API 请求数
   #holdRequestWaiters = []; // 等待并发名额的翻译请求
   #holdRequestLimit = 5; // 按住触发翻译的最大并发请求数
+  #holdUnitsCache = new WeakMap(); // 区域容器 -> 已收集的翻译单元（DOM 变更/重扫描时失效）
   #hoveredNode = null; // 存储当前悬停的可翻译节点
   #hoverPointer = { x: 0, y: 0 }; // 最近一次鼠标位置，用于定位气泡
   #hoverPointerValid = false; // 是否已经收到过有效的 mousemove 坐标
@@ -914,6 +915,8 @@ export class Translator {
   // 初始化
   #init() {
     this.#isInitialized = true;
+    // 重新初始化意味着规则/DOM 都可能变化，按住翻译的区域单元缓存全部失效
+    this.#holdUnitsCache = new WeakMap();
 
     // 注入JS/CSS
     this.#initInjector();
@@ -1334,7 +1337,7 @@ export class Translator {
     document.addEventListener(
       "mousemove",
       this.#boundMouseHoldMoveHandler,
-      true
+      { capture: true, passive: true }
     );
     document.addEventListener(
       "click",
@@ -1799,8 +1802,22 @@ export class Translator {
     if (!this.#isWithinRuleRoots(container)) {
       return;
     }
-    this.#scanNode(container);
-    const units = this.#collectHoverBlockUnits(container);
+    let units = this.#holdUnitsCache.get(container);
+    if (units) {
+      // 命中缓存：DOM 未变化时跳过对整个区域的重复扫描与遍历。
+      // 规则变更（如忽略选择器）走 updateRule 的轻量路径、不会触发重扫描，
+      // 因此这里对缓存单元做一次轻量过滤，保证规则实时生效。
+      units = units.filter(
+        (unit) => !unit.closest?.(this.#ignoreSelector)
+      );
+    } else {
+      this.#scanNode(container);
+      units = this.#collectHoverBlockUnits(container);
+      // 空结果不缓存：区域可能尚未扫描完成，下次按住再尝试
+      if (units.length > 0) {
+        this.#holdUnitsCache.set(container, units);
+      }
+    }
     if (units.length === 0) {
       this.#toggleTargetNode(
         this.#hoveredNode,
@@ -1854,9 +1871,14 @@ export class Translator {
   #collectHoverBlockUnits(container) {
     const units = [];
     const maxLength = Number(this.#setting.maxLength) || 100000;
-    const visit = (node) => {
+    const visit = (node, isRoot) => {
       if (!Translator.isElementOrFragment(node)) return;
-      if (node.closest?.(this.#ignoreSelector)) return;
+      // 根节点需检查整条祖先链；递归进入的子节点其祖先已在上一层验证过，
+      // 只需 matches 检查自身，避免每个节点都重复遍历祖先链。
+      const isIgnored = isRoot
+        ? node.closest?.(this.#ignoreSelector)
+        : node.matches?.(this.#ignoreSelector);
+      if (isIgnored) return;
       if (this.#observedNodes.has(node)) {
         // 超大容器不适合作为单一翻译单元（会超过接口长度限制），继续下钻到子单元
         const isOversized = (node.textContent || "").trim().length > maxLength;
@@ -1867,10 +1889,10 @@ export class Translator {
       // 即使节点自身被观察也继续下钻：混合容器（自身含直接文本 + 块级子节点）
       // 需要同时翻译其直接文本与子单元，避免只翻译第一行/跳过块级子节点。
       for (const child of node.children || []) {
-        visit(child);
+        visit(child, false);
       }
     };
-    visit(container);
+    visit(container, true);
     return units;
   }
 
@@ -2094,6 +2116,9 @@ export class Translator {
 
   // 处理“脏容器”
   #rescanContainer(changedNode) {
+    // DOM 发生变化，按住翻译的区域单元缓存不再可靠，全部失效
+    this.#holdUnitsCache = new WeakMap();
+
     const container = this.#findChangeContainer(changedNode);
     if (!container) return;
 
@@ -4014,6 +4039,7 @@ overflow-wrap: anywhere !important;`;
     this.#removeKeydownHandler2?.();
     this.#removeMouseHoldHandlers?.();
     this.#cancelMouseHold();
+    this.#holdUnitsCache = new WeakMap();
   }
 
   #enableTransOnlyRevert() {

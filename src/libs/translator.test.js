@@ -2234,6 +2234,149 @@ describe("Translator rule styles", () => {
     );
   });
 
+  test("picks up newly added content in the whole area after DOM changes", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <section id="area">
+          <p id="p1">Paragraph 1</p>
+          <p id="p2">Paragraph 2</p>
+        </section>
+      </main>
+    `;
+    const first = document.getElementById("p1");
+    const area = document.getElementById("area");
+
+    const translator = createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+        },
+      }
+    );
+
+    const hold = () => {
+      first.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          button: 0,
+          clientX: 20,
+          clientY: 20,
+        })
+      );
+      jest.advanceTimersByTime(300);
+      document.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true, button: 0 })
+      );
+    };
+
+    await hoverNode(first, 20, 20);
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(2);
+
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+
+    // 区域新增段落：生产环境中 MutationObserver 驱动的重扫描会使单元缓存失效。
+    // 测试环境 MO→空闲定时器链在假定时器下不可靠，这里与仓库既有重扫描测试
+    // 一致，显式调用 rescan() 触发同样的失效路径（rescan -> #init 清空缓存）。
+    const p3 = document.createElement("p");
+    p3.id = "p3";
+    p3.textContent = "Paragraph 3";
+    area.appendChild(p3);
+    translator.rescan();
+    await flushAsync();
+
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(3);
+  });
+
+  test("applies a changed ignore selector to cached whole-area units", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <section id="area">
+          <p id="p1">Paragraph 1</p>
+          <p id="p2">Paragraph 2</p>
+        </section>
+      </main>
+    `;
+    const second = document.getElementById("p2");
+
+    const translator = createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+        },
+      }
+    );
+
+    const hold = () => {
+      second.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          button: 0,
+          clientX: 20,
+          clientY: 20,
+        })
+      );
+      jest.advanceTimersByTime(300);
+      document.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true, button: 0 })
+      );
+    };
+
+    await hoverNode(second, 20, 20);
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(2);
+
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+
+    // 动态变更忽略规则：只重挂 IO、不触发重扫描，缓存单元需在用时重新过滤
+    translator.updateRule({ ignoreSelector: "#p1" });
+    await flushAsync();
+
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(1);
+    expect(
+      document.querySelector(`#p1 .${Translator.KISS_CLASS.warpper}`)
+    ).toBeNull();
+    expect(
+      document.querySelector(`#p2 .${Translator.KISS_CLASS.warpper}`)
+    ).not.toBeNull();
+  });
+
   test("translates only the current paragraph in paragraph scope mode", async () => {
     document.body.innerHTML = `
       <main id="root">
