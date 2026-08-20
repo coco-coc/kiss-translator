@@ -4,12 +4,34 @@ import { DEFAULT_API_SETTING } from "../config/api.js";
 import { DEFAULT_SUBTITLE_SETTING } from "../config/setting.js";
 import { logger } from "../libs/log.js";
 import { injectJs, INJECTOR } from "../injectors/index.js";
+import { getSetting, setSetting } from "../libs/storage.js";
 
 // 各视频平台对应的字幕初始化拦截器配置
 // 目前仅配置了 YouTube 的匹配规则 (pattern) 及其对应的初始化引导器 (YouTubeInitializer)
 const providers = [
   { pattern: "https://www.youtube.com", start: YouTubeInitializer },
 ];
+
+/**
+ * 仅合并保存字幕位置，避免拖动字幕时覆盖同时存在的其他设置。
+ *
+ * @param {number} positionRatio 字幕底边相对播放器高度的比例。
+ * @returns {Promise<void>}
+ */
+export async function persistSubtitlePosition(positionRatio) {
+  try {
+    const currentSetting = (await getSetting()) || {};
+    await setSetting({
+      ...currentSetting,
+      subtitleSetting: {
+        ...(currentSetting.subtitleSetting || DEFAULT_SUBTITLE_SETTING),
+        positionRatio,
+      },
+    });
+  } catch (err) {
+    logger.warn("save subtitle position failed", err);
+  }
+}
 
 /**
  * 运行双语字幕翻译服务的主入口。
@@ -55,6 +77,7 @@ export function runSubtitle({ href, setting }) {
         prompts: setting.prompts,
         uiLang: setting.uiLang,
         translateVariants: setting.translateVariants ?? true,
+        onSubtitlePositionChange: persistSubtitlePosition,
       });
     }
   } catch (err) {
