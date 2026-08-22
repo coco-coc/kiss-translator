@@ -2,9 +2,10 @@ import { YouTubeInitializer } from "./YouTubeCaptionProvider.js";
 import { isMatch } from "../libs/utils.js";
 import { DEFAULT_API_SETTING } from "../config/api.js";
 import { DEFAULT_SUBTITLE_SETTING } from "../config/setting.js";
+import { KV_SETTING_KEY } from "../config/storage.js";
 import { logger } from "../libs/log.js";
 import { injectJs, INJECTOR } from "../injectors/index.js";
-import { getSetting, setSetting } from "../libs/storage.js";
+import { debounceSyncMeta, getSetting, setSetting } from "../libs/storage.js";
 
 // 各视频平台对应的字幕初始化拦截器配置
 // 目前仅配置了 YouTube 的匹配规则 (pattern) 及其对应的初始化引导器 (YouTubeInitializer)
@@ -12,14 +13,16 @@ const providers = [
   { pattern: "https://www.youtube.com", start: YouTubeInitializer },
 ];
 
+let subtitlePositionWriteQueue = Promise.resolve();
+
 /**
  * 仅合并保存字幕位置，避免拖动字幕时覆盖同时存在的其他设置。
  *
  * @param {number} positionRatio 字幕底边相对播放器高度的比例。
  * @returns {Promise<void>}
  */
-export async function persistSubtitlePosition(positionRatio) {
-  try {
+export function persistSubtitlePosition(positionRatio) {
+  const write = subtitlePositionWriteQueue.then(async () => {
     const currentSetting = (await getSetting()) || {};
     await setSetting({
       ...currentSetting,
@@ -28,9 +31,13 @@ export async function persistSubtitlePosition(positionRatio) {
         positionRatio,
       },
     });
-  } catch (err) {
+    debounceSyncMeta(KV_SETTING_KEY);
+  });
+
+  subtitlePositionWriteQueue = write.catch(() => {});
+  return write.catch((err) => {
     logger.warn("save subtitle position failed", err);
-  }
+  });
 }
 
 /**
