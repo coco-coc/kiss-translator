@@ -2639,7 +2639,7 @@ describe("Translator rule styles", () => {
 
   test("does not register hold handlers on touch-only devices", async () => {
     window.matchMedia.mockImplementation((query) => ({
-      matches: query !== "(hover: hover)",
+      matches: query !== "(any-hover: hover)",
       media: query,
       onchange: null,
       addListener: jest.fn(),
@@ -2679,6 +2679,278 @@ describe("Translator rule styles", () => {
     jest.advanceTimersByTime(500);
     await flushAsync();
 
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+  });
+
+  test("registers hold handlers on hybrid touch devices with a hover-capable secondary input", async () => {
+    window.matchMedia.mockImplementation((query) => ({
+      matches: query !== "(hover: hover)",
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }));
+    document.body.innerHTML =
+      '<main id="root"><p id="target">Hold target</p></main>';
+    const target = document.getElementById("target");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    await hoverNode(target, 20, 20);
+    target.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(300);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#target .${Translator.KISS_CLASS.warpper}`)
+    ).not.toBeNull();
+  });
+
+  test("uses the element under the cursor instead of a stale hovered node", async () => {
+    document.body.innerHTML =
+      '<main id="root"><p id="old">Old paragraph</p></main>';
+    const oldNode = document.getElementById("old");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    await hoverNode(oldNode, 20, 20);
+
+    // 光标下的 DOM 被动态替换，新元素尚未被扫描登记
+    const newP = document.createElement("p");
+    newP.id = "new";
+    newP.textContent = "New paragraph";
+    document.getElementById("root").appendChild(newP);
+    document.elementFromPoint = () => newP;
+
+    newP.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#new .${Translator.KISS_CLASS.warpper}`)
+    ).not.toBeNull();
+    expect(
+      document.querySelector(`#old .${Translator.KISS_CLASS.warpper}`)
+    ).toBeNull();
+  });
+
+  test("falls back to the mousedown target when no hover coordinates exist", async () => {
+    document.body.innerHTML =
+      '<main id="root"><p id="target">Hold target</p></main>';
+    const target = document.getElementById("target");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    // 页面加载后光标未移动，直接长按：没有 hover 坐标可供定位
+    target.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      document.querySelector(`#target .${Translator.KISS_CLASS.warpper}`)
+    ).not.toBeNull();
+  });
+
+  test("does not suppress click when the held link is excluded by rules", async () => {
+    document.body.innerHTML =
+      '<main id="root"><a id="link" href="#">darkwalker1212:feat/MouseHold</a></main>';
+    const link = document.getElementById("link");
+    document.elementFromPoint = () => link;
+
+    createTranslator(
+      { transOpen: "false", rootsSelector: "body", ignoreSelector: "#link" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+          mouseHoverPreventClick: true,
+        },
+      }
+    );
+
+    await hoverNode(link, 20, 20);
+    link.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    link.dispatchEvent(click);
+
+    // 被规则排除的目标没有被翻译，也不应吞掉点击
+    expect(click.defaultPrevented).toBe(false);
+    expect(
+      document.querySelector(`#link .${Translator.KISS_CLASS.warpper}`)
+    ).toBeNull();
+  });
+
+  test("does not send queued whole-area requests after the container is restored", async () => {
+    const resolvers = [];
+    apiTranslate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        })
+    );
+    const drain = async () => {
+      for (let i = 0; i < 8; i++) await Promise.resolve();
+    };
+    document.body.innerHTML = `
+      <main id="root">
+        <section id="area">
+          ${[1, 2, 3, 4, 5, 6]
+            .map((i) => `<p id="p${i}">Paragraph ${i}</p>`)
+            .join("")}
+        </section>
+      </main>
+    `;
+    const first = document.getElementById("p1");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+        },
+      }
+    );
+
+    const hold = () => {
+      first.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          button: 0,
+          clientX: 20,
+          clientY: 20,
+        })
+      );
+      jest.advanceTimersByTime(300);
+      document.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true, button: 0 })
+      );
+    };
+
+    await hoverNode(first, 20, 20);
+    hold();
+    await drain();
+    expect(resolvers).toHaveLength(5); // 并发上限 5，第 6 个单元在排队
+
+    // 第二次按住：还原，移除所有 loading 容器（包括排队中单元的容器）
+    hold();
+    await drain();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+
+    // 完成全部在途请求：排队任务被唤醒后必须放弃，不得再调用翻译接口
+    for (let i = 0; i < 5; i++) {
+      resolvers[i]({ trText: "Translated", isSame: false });
+    }
+    await drain();
+    await drain();
+
+    expect(resolvers).toHaveLength(5);
     expect(
       document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
     ).toHaveLength(0);

@@ -374,6 +374,7 @@ export class Translator {
   #mouseHoldTriggered = false; // 本次按住是否已经触发过翻译
   #mouseHoldStartX = 0; // 按住左键时的起始 X 坐标
   #mouseHoldStartY = 0; // 按住左键时的起始 Y 坐标
+  #mouseHoldDownTarget = null; // 按住左键按下时的事件目标（坐标定位失败时兜底）
   #boundMouseDownHandler = null; // 鼠标左键按下事件
   #boundMouseUpHandler = null; // 鼠标左键松开事件
   #boundMouseHoldMoveHandler = null; // 按住期间移动取消事件
@@ -1346,14 +1347,15 @@ export class Translator {
     return display !== OPT_MOUSE_HOVER_TRANS_DISPLAY_INLINE;
   }
 
-  // 纯触屏设备（主输入设备不支持悬停）上“按住鼠标左键”没有对应语义，
+  // 纯触屏设备（无任何支持悬停的指针输入）上“按住鼠标左键”没有对应语义，
   // 长按会触发系统菜单/选词，容易误触发翻译，因此不注册按住监听。
+  // 使用 any-hover：触屏为主但外接鼠标/触控板的混合设备仍应启用。
   // matchMedia 不可用或抛错时（极旧环境）默认启用。
   #isHoldSupportedByDevice() {
     try {
       return (
         typeof window.matchMedia !== "function" ||
-        window.matchMedia("(hover: hover)").matches
+        window.matchMedia("(any-hover: hover)").matches
       );
     } catch (err) {
       return true;
@@ -1474,6 +1476,7 @@ export class Translator {
     );
     this.#mouseHoldStartX = event.clientX;
     this.#mouseHoldStartY = event.clientY;
+    this.#mouseHoldDownTarget = target;
 
     this.#mouseHoldTimer = setTimeout(() => {
       this.#mouseHoldTimer = null;
@@ -1482,10 +1485,16 @@ export class Translator {
       const selectionText = window.getSelection?.()?.toString()?.trim();
       if (selectionText) return;
       this.#mouseHoldTriggered = true;
-      if (this.#mouseHoldPreventClickEnabled && this.#mouseHoldInteractive) {
+      const accepted = this.#handleMouseHoldToggle();
+      // 只有实际接受（翻译或还原）了目标时才启用点击抑制：
+      // 被规则排除或未命中任何目标的按住不应吞掉后续的导航/按钮点击
+      if (
+        accepted &&
+        this.#mouseHoldPreventClickEnabled &&
+        this.#mouseHoldInteractive
+      ) {
         this.#mouseHoldSuppressClick = true;
       }
-      this.#handleMouseHoldToggle();
     }, this.#getMouseHoldDelay());
   }
 
@@ -1519,6 +1528,7 @@ export class Translator {
     this.#mouseHoldTriggered = false;
     this.#mouseHoldPreventClickEnabled = false;
     this.#mouseHoldInteractive = false;
+    this.#mouseHoldDownTarget = null;
     if (this.#mouseHoldSuppressClick) {
       // click 事件在 mouseup 之后同步触发，这里仅作为兜底清理，
       // 避免窗口失焦等场景下标志残留导致下一次点击被误拦截。
@@ -1540,48 +1550,58 @@ export class Translator {
     let targetNode = this.#hoveredNode;
     // 触发瞬间重新用鼠标坐标定位，避免滚动/动态渲染后悬停节点过期
     // （Outlook 邮件正文等页面容易出现只命中第一行的问题）。
-    if (this.#hoverPointerValid) {
-      try {
-        const el = document.elementFromPoint?.(
-          this.#hoverPointer.x,
-          this.#hoverPointer.y
-        );
-        if (el) {
-          // 链接/按钮等可交互文字元素优先作为独立翻译目标，
-          // 避免跳转到其外层容器后翻译范围过大。
-          const atomic = this.#findAtomicHoldTarget(el);
-          if (atomic) {
-            targetNode = atomic;
-          } else {
-            let node = el;
-            while (node && node !== document.body) {
-              if (this.#observedNodes.has(node)) {
-                targetNode = node;
-                break;
-              }
-              node = node.parentElement;
+    // 页面刚加载、尚未收到 mousemove 时，退回 mousedown 时的坐标。
+    const pointerX = this.#hoverPointerValid
+      ? this.#hoverPointer.x
+      : this.#mouseHoldStartX;
+    const pointerY = this.#hoverPointerValid
+      ? this.#hoverPointer.y
+      : this.#mouseHoldStartY;
+    try {
+      const el = document.elementFromPoint?.(pointerX, pointerY);
+      if (el) {
+        // 链接/按钮等可交互文字元素优先作为独立翻译目标，
+        // 避免跳转到其外层容器后翻译范围过大。
+        const atomic = this.#findAtomicHoldTarget(el);
+        if (atomic) {
+          targetNode = atomic;
+        } else {
+          let resolved = null;
+          let node = el;
+          while (node && node !== document.body) {
+            if (this.#observedNodes.has(node)) {
+              resolved = node;
+              break;
             }
-            // 鼠标下的节点尚未被扫描/登记时，也直接使用该元素，
-            // 避免动态内容在初始化前触发时丢失目标。
-            if (
-              !targetNode &&
-              Translator.isElement(el) &&
-              el !== document.body &&
-              el !== document.documentElement
-            ) {
-              targetNode = el;
-            }
+            node = node.parentElement;
+          }
+          // 鼠标下的节点尚未被扫描/登记时，优先采用本次命中元素，
+          // 避免 DOM 被动态替换后过期的悬停节点胜出。
+          if (
+            !resolved &&
+            Translator.isElement(el) &&
+            el !== document.body &&
+            el !== document.documentElement
+          ) {
+            resolved = el;
+          }
+          if (resolved) {
+            targetNode = resolved;
           }
         }
-      } catch (err) {
-        kissLog("mouse hold resolve target", err);
       }
+    } catch (err) {
+      kissLog("mouse hold resolve target", err);
+    }
+    // 坐标定位失败时退回 mousedown 按下时的目标元素
+    if (!targetNode) {
+      targetNode = this.#mouseHoldDownTarget;
     }
     if (this.#canShowOriginalInHoverBubble(targetNode)) {
       this.#showOriginalHoverBubble(targetNode);
-      return;
+      return true;
     }
-    if (!targetNode) return;
+    if (!targetNode) return false;
     // 鼠标悬停在译文容器上时，还原其所属的原始翻译单元
     if (targetNode.classList?.contains(Translator.KISS_CLASS.warpper)) {
       targetNode = targetNode.parentElement || targetNode;
@@ -1595,7 +1615,7 @@ export class Translator {
     if (atomicTarget) {
       if (this.#isHoldTargetAllowed(atomicTarget)) {
         this.#toggleTargetNode(atomicTarget, true, false);
-        return;
+        return true;
       }
       // 原子目标被规则排除时，回退到悬停时登记的容器/原文单元
       targetNode = this.#hoveredNode;
@@ -1605,7 +1625,7 @@ export class Translator {
     }
 
     // 规则设置优先：不满足不翻译节点选择器/根节点/目标选择器时直接跳过
-    if (!this.#isHoldTargetAllowed(targetNode)) return;
+    if (!this.#isHoldTargetAllowed(targetNode)) return false;
 
     // 容器内的文本全部位于块级子节点中时（如链接包裹 h1/span），
     // 直接翻译容器会因块级子节点被分段规则切断而落空，
@@ -1627,7 +1647,7 @@ export class Translator {
         true,
         this.#getMouseHoldBlockDisplay()
       );
-      return;
+      return true;
     }
 
     const area = this.#findMouseHoverAreaNode(targetNode, transMode);
@@ -1637,9 +1657,9 @@ export class Translator {
         true,
         this.#getMouseHoldBlockDisplay()
       );
-      return;
+      return true;
     }
-    this.#toggleHoverBlock(area);
+    return this.#toggleHoverBlock(area);
   }
 
   // 查找可作为独立翻译目标的链接/按钮等可交互文字元素。
@@ -1843,14 +1863,15 @@ export class Translator {
     return count;
   }
 
-  // 整块翻译/还原区域内的所有翻译单元
+  // 整块翻译/还原区域内的所有翻译单元。
+  // 返回是否实际接受（翻译或还原）了目标，供点击抑制判断使用。
   #toggleHoverBlock(container) {
     if (!this.#isInitialized) {
       this.#init();
     }
     // 区域容器必须在规则设置的根节点内，避免越界翻译
     if (!this.#isWithinRuleRoots(container)) {
-      return;
+      return false;
     }
     let units = this.#holdUnitsCache.get(container);
     if (units) {
@@ -1874,7 +1895,7 @@ export class Translator {
         true,
         this.#getMouseHoldBlockDisplay()
       );
-      return;
+      return true;
     }
 
     const allProcessed = units.every((unit) =>
@@ -1882,7 +1903,7 @@ export class Translator {
     );
     if (allProcessed) {
       this.#restoreHoverBlock(container);
-      return;
+      return true;
     }
 
     units.forEach((unit) => {
@@ -1893,6 +1914,7 @@ export class Translator {
         });
       }
     });
+    return true;
   }
 
   // 并发限流：区域模式按住触发可能一次翻译几十个单元，
@@ -3161,6 +3183,12 @@ export class Translator {
       if (options.limitConcurrency) {
         const wait = this.#acquireHoldRequestSlot();
         if (wait) await wait;
+        // 等待并发名额期间，容器可能已被第二次按住还原移除；
+        // 重新检查后丢弃任务并释放名额，避免把已还原的文本外发给翻译服务
+        if (!wrapper.isConnected) {
+          this.#releaseHoldRequestSlot();
+          return;
+        }
       }
       let translatedText;
       let isSameLang;
