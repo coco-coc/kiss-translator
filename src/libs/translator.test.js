@@ -2956,6 +2956,295 @@ describe("Translator rule styles", () => {
     ).toHaveLength(0);
   });
 
+  test("does not send requests when the area is restored during language detection", async () => {
+    const detectResolvers = [];
+    tryDetectLang.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          detectResolvers.push(resolve);
+        })
+    );
+    const apiResolvers = [];
+    apiTranslate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          apiResolvers.push(resolve);
+        })
+    );
+    document.body.innerHTML = `
+      <main id="root">
+        <section id="area">
+          <p id="p1">First paragraph</p>
+          <p id="p2">Second paragraph</p>
+        </section>
+      </main>
+    `;
+    const first = document.getElementById("p1");
+
+    createTranslator(
+      { transOpen: "false", fromLang: "auto" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+        },
+      }
+    );
+
+    const hold = () => {
+      first.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          button: 0,
+          clientX: 20,
+          clientY: 20,
+        })
+      );
+      jest.advanceTimersByTime(300);
+      document.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true, button: 0 })
+      );
+    };
+
+    await hoverNode(first, 20, 20);
+    hold();
+    await flushAsync();
+    expect(detectResolvers).toHaveLength(2); // 两个单元都停在语言检测
+    expect(apiResolvers).toHaveLength(0);
+
+    // 语言检测完成前第二次按住：还原区域
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+
+    // 检测此刻才完成：过期任务必须被废弃，不得创建容器或发起请求
+    detectResolvers.forEach((resolve) => resolve("en"));
+    await flushAsync();
+    await flushAsync();
+
+    expect(apiResolvers).toHaveLength(0);
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+  });
+
+  test("clears a stale paragraph hold state after restore during language detection", async () => {
+    const detectResolvers = [];
+    tryDetectLang.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          detectResolvers.push(resolve);
+        })
+    );
+    document.body.innerHTML = `
+      <main id="root">
+        <p id="p1">First paragraph</p>
+      </main>
+    `;
+    const first = document.getElementById("p1");
+
+    createTranslator(
+      { transOpen: "false", fromLang: "auto" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    const hold = () => {
+      first.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          button: 0,
+          clientX: 20,
+          clientY: 20,
+        })
+      );
+      jest.advanceTimersByTime(300);
+      document.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true, button: 0 })
+      );
+    };
+
+    await hoverNode(first, 20, 20);
+    hold();
+    await flushAsync();
+    expect(detectResolvers).toHaveLength(1);
+
+    // 语言检测完成前第二次按住：还原当前段
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+
+    detectResolvers[0]("en");
+    await flushAsync();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+
+    // 过期任务必须回滚 processed 标记，后续按住仍可再次翻译当前段
+    tryDetectLang.mockResolvedValue("en");
+    hold();
+    await flushAsync();
+    await flushAsync();
+    expect(
+      document.querySelector(`#p1 .${Translator.KISS_CLASS.warpper}`)
+    ).not.toBeNull();
+  });
+
+  test("applies a tightened target selector to cached whole-area units", async () => {
+    document.body.innerHTML = `
+      <main id="root">
+        <section id="area">
+          <p id="p1">Paragraph 1</p>
+          <p id="p2">Paragraph 2</p>
+        </section>
+      </main>
+    `;
+    const second = document.getElementById("p2");
+
+    const translator = createTranslator(
+      { transOpen: "false", autoScan: "false", selector: "#p1, #p2" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 300,
+        },
+      }
+    );
+
+    const hold = () => {
+      second.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          button: 0,
+          clientX: 20,
+          clientY: 20,
+        })
+      );
+      jest.advanceTimersByTime(300);
+      document.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true, button: 0 })
+      );
+    };
+
+    await hoverNode(second, 20, 20);
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(2);
+
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(0);
+
+    // 收紧目标选择器：缓存中的 p1 必须在用时被完整规则校验剔除
+    translator.updateRule({ selector: "#p2" });
+    await flushAsync();
+
+    hold();
+    await flushAsync();
+    expect(
+      document.querySelectorAll(`.${Translator.KISS_CLASS.warpper}`)
+    ).toHaveLength(1);
+    expect(
+      document.querySelector(`#p1 .${Translator.KISS_CLASS.warpper}`)
+    ).toBeNull();
+    expect(
+      document.querySelector(`#p2 .${Translator.KISS_CLASS.warpper}`)
+    ).not.toBeNull();
+  });
+
+  test("holds to translate a paragraph inside an open shadow root", async () => {
+    document.body.innerHTML =
+      '<main id="root"><section id="host"></section></main>';
+    const host = document.getElementById("host");
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    Object.defineProperty(shadowRoot, "adoptedStyleSheets", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    shadowRoot.innerHTML = '<p id="sp">Shadow paragraph</p>';
+    const sp = shadowRoot.getElementById("sp");
+    // Shadow DOM 命中时 elementFromPoint 只返回宿主元素
+    document.elementFromPoint = () => host;
+
+    createTranslator(
+      { transOpen: "false", scanAll: "true" },
+      {
+        preInit: true,
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          mouseHoverKeyHold: true,
+          mouseHoverKey2Hold: false,
+          mouseHoverHoldDelay: 200,
+          mouseHoverTransMode: "paragraph",
+        },
+      }
+    );
+
+    await flushAsync();
+
+    sp.dispatchEvent(
+      new MouseEvent("mousemove", {
+        bubbles: true,
+        composed: true,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(100);
+    await flushAsync();
+
+    sp.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        composed: true,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      })
+    );
+    jest.advanceTimersByTime(200);
+    await flushAsync();
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, button: 0 })
+    );
+
+    expect(
+      sp.querySelector(`.${Translator.KISS_CLASS.warpper}`)
+    ).not.toBeNull();
+  });
+
   test("caps concurrent hold-triggered whole-area requests and drains the queue", async () => {
     const resolvers = [];
     apiTranslate.mockImplementation(
